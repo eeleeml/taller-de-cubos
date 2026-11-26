@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Taller de cubos: rotación de figuras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EAF0F7; --panel:#FFFFFF; --ink:#1B2740; --muted:#56627C; --line:#C9D4E3;
+  --cell:#F4F7FB; --cube:#8FB6E8; --cube-deep:#4F7FC1; --mark:#F2C230;
+  --ok:#17784F; --ok-bg:#DDF3E8; --warn:#8A5A00; --warn-bg:#FCEFC9; --bad:#A8322B; --bad-bg:#F9E0DE;
+  --neutral-bg:#DFE6F0;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1626; --panel:#172138; --ink:#E5ECF8; --muted:#9BA8C3; --line:#2B3956;
+    --cell:#1E2A44; --cube:#8FB6E8; --cube-deep:#9DBDEB; --mark:#F2C230;
+    --ok:#7FDDB0; --ok-bg:#123527; --warn:#F5CF6B; --warn-bg:#3A2E0E; --bad:#F29A92; --bad-bg:#3C1A1A;
+    --neutral-bg:#1E2A44;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1626; --panel:#172138; --ink:#E5ECF8; --muted:#9BA8C3; --line:#2B3956;
+  --cell:#1E2A44; --cube:#8FB6E8; --cube-deep:#9DBDEB; --mark:#F2C230;
+  --ok:#7FDDB0; --ok-bg:#123527; --warn:#F5CF6B; --warn-bg:#3A2E0E; --bad:#F29A92; --bad-bg:#3C1A1A;
+  --neutral-bg:#1E2A44;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:16px; line-height:1.45;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size:28px 28px;
+  background-attachment:fixed;
+}
+button,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+
+.wrap{max-width:1320px;margin:0 auto;padding:20px 20px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 28px;margin-bottom:18px}
+header.top h1{
+  margin:0;font-size:clamp(2rem,4.5vw,3.1rem);line-height:.95;
+  font-stretch:72%;font-weight:800;letter-spacing:-.01em;
+}
+header.top p{margin:0;max-width:58ch;color:var(--muted)}
+
+.app{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
+@media (max-width:960px){.app{grid-template-columns:1fr}}
+
+.panel{background:var(--panel);border:1.5px solid var(--line);border-radius:6px}
+
+/* Editor */
+.editor{padding:16px;display:flex;flex-direction:column;gap:16px}
+.editor h2{margin:0;font-size:1.1rem;font-stretch:85%;font-weight:750}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:9px 6px;cursor:pointer;font-weight:650}
+.seg button + button{border-left:1.5px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dims label{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted)}
+.dims select{padding:7px 8px;border:1.5px solid var(--line);border-radius:5px;background:var(--cell)}
+
+.build{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+.levels{display:flex;flex-direction:column;gap:4px}
+.levels button{
+  display:flex;justify-content:space-between;gap:10px;min-width:86px;
+  padding:6px 9px;border:1.5px solid var(--line);border-radius:5px;background:var(--cell);cursor:pointer;font-size:.86rem
+}
+.levels button span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+.levels button[aria-pressed="true"]{border-color:var(--ink);background:var(--mark);color:#1B2740}
+.levels button[aria-pressed="true"] span:last-child{color:#1B2740}
+.gridwrap{display:flex;flex-direction:column;gap:4px;align-items:stretch}
+.edge{font-size:.75rem;color:var(--muted);text-align:center}
+.edge.front{color:var(--ink);font-weight:650;border-top:4px solid #E8890C;padding-top:3px;margin-top:2px}
+.grid{display:grid;gap:4px;touch-action:none;user-select:none}
+.cell{
+  aspect-ratio:1;border:1.5px dashed var(--line);border-radius:4px;background:var(--cell);
+  cursor:pointer;padding:0;position:relative
+}
+.cell.below{border-style:solid;border-color:var(--cube-deep);background:repeating-linear-gradient(45deg,transparent 0 5px,color-mix(in srgb,var(--cube) 35%,transparent) 5px 7px)}
+.cell.on{background:var(--cube);border:1.5px solid #1B2740;box-shadow:inset 0 -5px 0 #5C8BCB, inset 0 4px 0 #C9DDF6}
+.hint{font-size:.8rem;color:var(--muted);margin:0}
+.hint i{display:inline-block;width:12px;height:12px;vertical-align:-1px;border-radius:2px;margin-right:3px}
+
+.tools{display:flex;flex-wrap:wrap;gap:6px}
+.btn{
+  padding:7px 11px;border:1.5px solid var(--ink);border-radius:5px;background:var(--panel);
+  cursor:pointer;font-weight:600;font-size:.88rem;line-height:1.2
+}
+.btn:hover{background:var(--cell)}
+.btn.primary{background:var(--ink);color:var(--panel)}
+.btn.primary:hover{opacity:.9;background:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.share textarea{
+  width:100%;min-height:58px;resize:vertical;padding:8px;border:1.5px solid var(--line);border-radius:5px;
+  background:var(--cell);font-size:.85rem;word-break:break-all
+}
+.share .msg{font-size:.8rem;color:var(--muted);min-height:1.2em;margin:4px 0 0}
+
+/* Stage */
+.stage{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:640px){.stage{grid-template-columns:1fr}}
+.viewer{display:flex;flex-direction:column;overflow:hidden;cursor:default}
+.viewer.active{border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
+.vhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 14px 0}
+.vhead h3{margin:0;font-size:1.25rem;font-stretch:80%;font-weight:800}
+.vhead .count{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.vhead .edit{border:0;background:none;padding:2px 0;cursor:pointer;font-size:.85rem;text-decoration:underline;color:var(--muted)}
+.viewer.active .vhead .edit{color:var(--ink);text-decoration:none;font-weight:700}
+.canvas{position:relative;aspect-ratio:1/1;min-height:260px;touch-action:none;cursor:grab}
+.canvas:active{cursor:grabbing}
+.canvas canvas{display:block;width:100%;height:100%}
+.canvas .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:24px;pointer-events:none;font-size:.92rem}
+.vtools{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.vtools .btn{padding:6px 9px;font-size:.84rem}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+
+.verdict{grid-column:1/-1;padding:18px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;border-width:2px}
+.verdict .big{margin:0;font-size:clamp(1.35rem,2.6vw,2rem);line-height:1.05;font-stretch:75%;font-weight:800;flex:1 1 320px}
+.verdict .small{margin:4px 0 0;font-size:.92rem;font-stretch:100%;font-weight:450;color:inherit;opacity:.85;line-height:1.4}
+.verdict.ok{background:var(--ok-bg);color:var(--ok);border-color:currentColor}
+.verdict.warn{background:var(--warn-bg);color:var(--warn);border-color:currentColor}
+.verdict.bad{background:var(--bad-bg);color:var(--bad);border-color:currentColor}
+.verdict.neutral{background:var(--neutral-bg);color:var(--ink)}
+.verdict .btn{border-color:currentColor;color:inherit;background:transparent}
+
+.how{margin-top:18px;padding:16px 18px;color:var(--muted);font-size:.92rem}
+.how h2{margin:0 0 6px;font-size:1rem;color:var(--ink);font-stretch:85%}
+.how ol{margin:0;padding-left:1.2em;max-width:75ch}
+.how li{margin:3px 0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Taller de cubos</h1>
+    <p>Construye la figura modelo y la opción que dudas, nivel a nivel. Gíralas en 3D y comprueba al instante si la opción es la misma figura girada o su imagen en espejo.</p>
+  </header>
+
+  <div class="app">
+    <!-- EDITOR -->
+    <section class="panel editor" aria-label="Editor de figuras">
+      <div>
+        <h2 style="margin-bottom:8px">Estás editando</h2>
+        <div class="seg" role="group" aria-label="Figura que editas">
+          <button id="tabA" aria-pressed="true">Modelo (A)</button>
+          <button id="tabB" aria-pressed="false">Opción (B)</button>
+        </div>
+      </div>
+
+      <div class="dims">
+        <label>Ancho<select id="dimX"></select></label>
+        <label>Alto<select id="dimY"></select></label>
+        <label>Fondo<select id="dimZ"></select></label>
+      </div>
+
+      <div>
+        <h2 style="margin-bottom:8px">Marca los cubos de cada nivel</h2>
+        <div class="build">
+          <div class="levels" id="levels" role="group" aria-label="Niveles"></div>
+          <div class="gridwrap">
+            <div class="edge">fondo</div>
+            <div class="grid" id="grid" role="grid" aria-label="Cuadrícula del nivel"></div>
+            <div class="edge front">frente (línea naranja en 3D)</div>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:8px">Toca o arrastra para poner y quitar cubos. También puedes tocar las casillas amarillas directamente en la vista 3D. <i style="background:repeating-linear-gradient(45deg,transparent 0 3px,var(--cube) 3px 5px);border:1px solid var(--cube-deep)"></i>cubo del nivel de abajo.</p>
+      </div>
+
+      <div class="tools">
+        <button class="btn" id="btnClearLayer">Vaciar nivel</button>
+        <button class="btn" id="btnClear">Vaciar figura</button>
+        <button class="btn" id="btnMirror" title="Refleja la figura de izquierda a derecha">Reflejar</button>
+        <button class="btn" id="btnCopy">Copiar en B</button>
+        <button class="btn" id="btnSwap">Intercambiar A y B</button>
+      </div>
+
+    </section>
+
+    <!-- STAGE -->
+    <section class="stage" aria-label="Vista 3D">
+      <article class="panel viewer active" id="cardA">
+        <div class="vhead">
+          <h3>Modelo (A)</h3>
+          <span class="count" id="countA"></span>
+          <button class="edit" data-edit="A">Editando</button>
+        </div>
+        <div class="canvas" id="viewA"><div class="empty" id="emptyA">Marca cubos en la cuadrícula para construir el modelo.</div></div>
+        <div class="vtools" data-v="A"></div>
+      </article>
+
+      <article class="panel viewer" id="cardB">
+        <div class="vhead">
+          <h3>Opción (B)</h3>
+          <span class="count" id="countB"></span>
+          <button class="edit" data-edit="B">Editar</button>
+        </div>
+        <div class="canvas" id="viewB"><div class="empty" id="emptyB">Construye aquí la opción que quieres comprobar.</div></div>
+        <div class="vtools" data-v="B"></div>
+      </article>
+
+      <div class="panel verdict neutral" id="verdict" role="status" aria-live="polite">
+        <div class="big"><span id="vTitle"></span><p class="small" id="vText"></p></div>
+        <button class="btn" id="btnAlign" hidden>Orientar B como A</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel how">
+    <h2>Cómo usarlo para un ejercicio</h2>
+    <ol>
+      <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
+      <li>Pasa a B y construye la opción que quieres comprobar. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
+      <li>Arrastra cada vista para girarla libremente, o usa los botones para girar 90° sobre cada eje. Enderezar la devuelve a una posición alineada.</li>
+      <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const MAX = 6;
+const STORE = "taller-cubos-v1";
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- Estado ---------- */
+function mkFig(n, cells){ return { n: n.slice(), c: new Set(cells) }; }
+function defaults(){
+  return {
+    A: mkFig([3,3,3], ["0,0,0","1,0,0","2,0,0","2,0,1","0,1,0","0,2,0","1,2,0"]),
+    B: mkFig([3,3,3], [])
+  };
+}
+let figs = defaults();
+let active = "A";
+let layer = 0;
+
+function save(){
+  try{
+    localStorage.setItem(STORE, JSON.stringify({A:encode(figs.A), B:encode(figs.B), active}));
+  }catch(e){}
+}
+function restore(){
+  try{
+    const raw = localStorage.getItem(STORE);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    const a = decode(d.A), b = decode(d.B);
+    if(a) figs.A = a;
+    if(b) figs.B = b;
+    if(d.active === "A" || d.active === "B") active = d.active;
+  }catch(e){}
+}
+
+/* ---------- Códigos ---------- */
+function encode(f){
+  const cells = [...f.c].map(k => k.split(",").join("")).sort();
+  return f.n.join("x") + ":" + cells.join(".");
+}
+function decode(str){
+  if(typeof str !== "string") return null;
+  const m = str.trim().replace(/\s+/g,"").match(/^([1-6])x([1-6])x([1-6]):([0-5.]*)$/);
+  if(!m) return null;
+  const n = [+m[1], +m[2], +m[3]];
+  const cells = [];
+  for(const t of m[4].split(".")){
+    if(!t) continue;
+    if(!/^\d{3}$/.test(t)) return null;
+    const [x,y,z] = t.split("").map(Number);
+    if(x>=n[0]||y>=n[1]||z>=n[2]) return null;
+    cells.push(x+","+y+","+z);
+  }
+  return mkFig(n, cells);
+}
+
+/* ---------- Comparación (24 giros) ---------- */
+const PERMS = [[0,1,2,1],[0,2,1,-1],[1,0,2,-1],[1,2,0,1],[2,0,1,1],[2,1,0,-1]];
+const ROTS = [];
+for(const [a,b,c,par] of PERMS)
+  for(const sx of [1,-1]) for(const sy of [1,-1]) for(const sz of [1,-1])
+    if(par*sx*sy*sz === 1) ROTS.push({p:[a,b,c], s:[sx,sy,sz]});
+
+function pts(f){ return [...f.c].map(k => k.split(",").map(Number)); }
+function applyRot(r, v){ return [r.s[0]*v[r.p[0]], r.s[1]*v[r.p[1]], r.s[2]*v[r.p[2]]]; }
+function norm(list){
+  if(!list.length) return "";
+  const mn = [0,1,2].map(i => Math.min(...list.map(v => v[i])));
+  return list.map(v => (v[0]-mn[0])+","+(v[1]-mn[1])+","+(v[2]-mn[2])).sort().join("|");
+}
+function findRot(fromPts, toKey){
+  for(const r of ROTS) if(norm(fromPts.map(v => applyRot(r,v))) === toKey) return r;
+  return null;
+}
+function rotQuat(r){
+  const m = [[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++) m[i][r.p[i]] = r.s[i];
+  const M = new THREE.Matrix4().set(
+    m[0][0],m[0][1],m[0][2],0,
+    m[1][0],m[1][1],m[1][2],0,
+    m[2][0],m[2][1],m[2][2],0,
+    0,0,0,1);
+  return new THREE.Quaternion().setFromRotationMatrix(M);
+}
+const SNAP_QUATS = ROTS.map(rotQuat);
+
+/* ---------- Visor 3D ---------- */
+const EDGE = 0x1B2740;
+const boxGeo = new THREE.BoxGeometry(1,1,1);
+const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+const cubeMat = new THREE.MeshLambertMaterial({color:0x8FB6E8, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1});
+const edgeMat = new THREE.LineBasicMaterial({color:EDGE});
+const ghostMat = new THREE.MeshLambertMaterial({color:0x8FB6E8, transparent:true, opacity:0.16, depthWrite:false});
+const ghostEdgeMat = new THREE.LineBasicMaterial({color:EDGE, transparent:true, opacity:0.22, depthWrite:false});
+const layerMat = new THREE.MeshBasicMaterial({color:0xF2C230, transparent:true, opacity:0.3, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2});
+const layerLineMat = new THREE.LineBasicMaterial({color:0xB8860B, transparent:true, opacity:0.85});
+const frontMat = new THREE.MeshBasicMaterial({color:0xE8890C});
+
+class Viewer{
+  constructor(el){
+    this.el = el;
+    this.renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+    this.renderer.setClearColor(0x000000, 0);
+    el.insertBefore(this.renderer.domElement, el.firstChild);
+    this.scene = new THREE.Scene();
+    this.cam = new THREE.OrthographicCamera(-1,1,1,-1,0.1,200);
+    this.cam.position.set(5, 9.5, 14);
+    this.cam.lookAt(0,0,0);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.58));
+    const d1 = new THREE.DirectionalLight(0xffffff, 0.62); d1.position.set(2, 10, 4); this.scene.add(d1);
+    const d2 = new THREE.DirectionalLight(0xffffff, 0.22); d2.position.set(-6, 1, 3); this.scene.add(d2);
+    this.group = new THREE.Group(); this.scene.add(this.group);
+    this.gizmo = this.makeGizmo(); this.scene.add(this.gizmo);
+    this.radius = 2; this.anim = null; this.dirty = true;
+    this.ray = new THREE.Raycaster(); this.pickables = []; this.onPick = null; this.n = [1,1,1]; this.editLayer = null;
+    this.bindDrag();
+    if(window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(el);
+    else window.addEventListener("resize", () => this.resize());
+  }
+  makeGizmo(){
+    const g = new THREE.Group();
+    const o = new THREE.Vector3(0,0,0);
+    [[new THREE.Vector3(1,0,0),0xD9534F],[new THREE.Vector3(0,1,0),0x2E9E5B],[new THREE.Vector3(0,0,1),0x3B6FD8]]
+      .forEach(([d,c]) => g.add(new THREE.ArrowHelper(d, o, 1, c, 0.3, 0.18)));
+    return g;
+  }
+  setFigure(f, editLayer){
+    while(this.group.children.length){
+      const c = this.group.children[0];
+      this.group.remove(c);
+      if(c.userData.own) c.geometry.dispose();
+    }
+    this.n = f.n.slice();
+    this.editLayer = (editLayer === null || editLayer === undefined) ? null : editLayer;
+    this.pickables = [];
+    const ctr = f.n.map(n => (n-1)/2);
+    for(const v of pts(f)){
+      const above = this.editLayer !== null && v[1] > this.editLayer;
+      const m = new THREE.Mesh(boxGeo, above ? ghostMat : cubeMat);
+      m.position.set(v[0]-ctr[0], v[1]-ctr[1], v[2]-ctr[2]);
+      m.add(new THREE.LineSegments(edgeGeo, above ? ghostEdgeMat : edgeMat));
+      if(above) m.renderOrder = 2;
+      if(v[1] === this.editLayer){ m.userData.k = v.join(","); this.pickables.push(m); }
+      this.group.add(m);
+    }
+    if(this.editLayer !== null){
+      const nx = f.n[0], nz = f.n[2], y = this.editLayer - ctr[1] - 0.5;
+      const fill = new THREE.Mesh(new THREE.PlaneGeometry(nx, nz), layerMat);
+      fill.rotation.x = -Math.PI/2; fill.position.y = y; fill.renderOrder = 1; fill.userData.own = true;
+      this.group.add(fill); this.pickables.push(fill);
+      const pos = [];
+      for(let i=0;i<=nx;i++){ const x = i - nx/2; pos.push(x,y,-nz/2, x,y,nz/2); }
+      for(let j=0;j<=nz;j++){ const z = j - nz/2; pos.push(-nx/2,y,z, nx/2,y,z); }
+      const lg = new THREE.BufferGeometry();
+      lg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      const lines = new THREE.LineSegments(lg, layerLineMat); lines.userData.own = true;
+      this.group.add(lines);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(nx + 0.1, 0.1, 0.1), frontMat);
+      bar.position.set(0, y, nz/2); bar.userData.own = true;
+      this.group.add(bar);
+    }
+    this.radius = 0.5*Math.sqrt(f.n[0]**2 + f.n[1]**2 + f.n[2]**2);
+    this.resize();
+  }
+  resize(){
+    const w = this.el.clientWidth, h = this.el.clientHeight;
+    if(!w || !h) return;
+    this.renderer.setSize(w, h, false);
+    const s = Math.max(2.6, this.radius*2*1.12);
+    const asp = w/h;
+    let hw, hh;
+    if(asp >= 1){ hh = s/2; hw = hh*asp; } else { hw = s/2; hh = hw/asp; }
+    Object.assign(this.cam, {left:-hw, right:hw, top:hh, bottom:-hh});
+    this.cam.updateProjectionMatrix();
+    const k = s/7.5;
+    this.gizmo.scale.setScalar(k);
+    const right = new THREE.Vector3(1,0,0).applyQuaternion(this.cam.quaternion);
+    const up = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
+    this.gizmo.position.copy(right.multiplyScalar(-hw + 0.85*k)).add(up.multiplyScalar(-hh + 0.6*k));
+    this.dirty = true;
+  }
+  bindDrag(){
+    const el = this.el;
+    let last = null, start = null, id = null, moved = false;
+    el.addEventListener("pointerdown", e => {
+      if(e.button !== undefined && e.button !== 0) return;
+      id = e.pointerId; last = [e.clientX, e.clientY]; start = last.slice(); moved = false;
+      try{ el.setPointerCapture(id); }catch(_){}
+    });
+    el.addEventListener("pointermove", e => {
+      if(e.pointerId !== id || !last) return;
+      if(!moved){
+        if(Math.hypot(e.clientX - start[0], e.clientY - start[1]) < 6) return;
+        moved = true; this.anim = null;
+      }
+      const dx = e.clientX - last[0], dy = e.clientY - last[1];
+      last = [e.clientX, e.clientY];
+      const right = new THREE.Vector3(1,0,0).applyQuaternion(this.cam.quaternion);
+      const up = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
+      const qa = new THREE.Quaternion().setFromAxisAngle(up, dx*0.012);
+      const qb = new THREE.Quaternion().setFromAxisAngle(right, dy*0.012);
+      this.group.quaternion.premultiply(qa).premultiply(qb);
+      this.dirty = true;
+    });
+    el.addEventListener("pointerup", e => {
+      if(e.pointerId !== id) return;
+      if(!moved) this.pick(e);
+      last = null; id = null;
+    });
+    el.addEventListener("pointercancel", e => { if(e.pointerId === id){ last = null; id = null; } });
+  }
+  pick(e){
+    if(!this.onPick) return;
+    if(this.editLayer === null){ this.onPick(null); return; }
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left)/r.width)*2 - 1, -((e.clientY - r.top)/r.height)*2 + 1);
+    this.ray.setFromCamera(ndc, this.cam);
+    const hits = this.ray.intersectObjects(this.pickables, false);
+    if(!hits.length) return;
+    const h = hits[0];
+    if(h.object.userData.k){ this.onPick(h.object.userData.k); return; }
+    const p = this.group.worldToLocal(h.point.clone());
+    const x = Math.floor(p.x + this.n[0]/2), z = Math.floor(p.z + this.n[2]/2);
+    if(x < 0 || z < 0 || x >= this.n[0] || z >= this.n[2]) return;
+    this.onPick(x + "," + this.editLayer + "," + z);
+  }
+  animateTo(q1){
+    const q0 = this.group.quaternion.clone();
+    if(reduceMotion){ this.group.quaternion.copy(q1); this.dirty = true; return; }
+    this.anim = {q0, q1:q1.clone(), t0:performance.now(), dur:380};
+  }
+  rotate(axis){
+    const cur = this.anim ? this.anim.q1.clone() : this.group.quaternion.clone();
+    const ax = new THREE.Vector3(axis==="x"?1:0, axis==="y"?1:0, axis==="z"?1:0);
+    const q = new THREE.Quaternion().setFromAxisAngle(ax, Math.PI/2).multiply(cur);
+    if(this.anim){ this.group.quaternion.copy(this.anim.q1); }
+    this.animateTo(q);
+  }
+  snap(){
+    const cur = this.group.quaternion;
+    let best = SNAP_QUATS[0], bd = -1;
+    for(const q of SNAP_QUATS){ const d = Math.abs(cur.dot(q)); if(d > bd){ bd = d; best = q; } }
+    this.animateTo(best);
+  }
+  reset(){ this.animateTo(new THREE.Quaternion()); }
+  tick(now){
+    if(this.anim){
+      const t = Math.min(1, (now - this.anim.t0)/this.anim.dur);
+      const e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+      THREE.Quaternion.slerp(this.anim.q0, this.anim.q1, this.group.quaternion, e);
+      if(t >= 1) this.anim = null;
+      this.dirty = true;
+    }
+    if(this.dirty){ this.renderer.render(this.scene, this.cam); this.dirty = false; }
+  }
+}
+
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+const viewers = { A: new Viewer($("viewA")), B: new Viewer($("viewB")) };
+["A","B"].forEach(k => {
+  viewers[k].onPick = key => {
+    if(active !== k){ setActive(k); return; }
+    if(!key) return;
+    const f = figs[k];
+    if(f.c.has(key)) f.c.delete(key); else f.c.add(key);
+    changed(k);
+  };
+});
+function refreshViews(){
+  viewers.A.setFigure(figs.A, active === "A" ? layer : null);
+  viewers.B.setFigure(figs.B, active === "B" ? layer : null);
+}
+
+// Barras de herramientas de cada visor
+document.querySelectorAll(".vtools").forEach(bar => {
+  const k = bar.dataset.v;
+  const items = [
+    ["Girar X","x","#D9534F","Gira 90° sobre el eje rojo"],
+    ["Girar Y","y","#2E9E5B","Gira 90° sobre el eje verde (vertical)"],
+    ["Girar Z","z","#3B6FD8","Gira 90° sobre el eje azul"]
+  ];
+  for(const [label, ax, col, title] of items){
+    const b = document.createElement("button");
+    b.className = "btn"; b.title = title;
+    b.innerHTML = '<span class="dot" style="background:'+col+'"></span>'+label;
+    b.addEventListener("click", () => viewers[k].rotate(ax));
+    bar.appendChild(b);
+  }
+  const s = document.createElement("button");
+  s.className = "btn"; s.textContent = "Enderezar"; s.title = "Ajusta a la posición alineada más cercana";
+  s.addEventListener("click", () => viewers[k].snap());
+  const r = document.createElement("button");
+  r.className = "btn"; r.textContent = "Restablecer"; r.title = "Vuelve a la vista inicial";
+  r.addEventListener("click", () => viewers[k].reset());
+  bar.append(s, r);
+});
+
+// Selectores de tamaño
+["dimX","dimY","dimZ"].forEach((id, i) => {
+  const sel = $(id);
+  for(let n=1;n<=MAX;n++){ const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); }
+  sel.addEventListener("change", () => {
+    const f = figs[active];
+    f.n[i] = +sel.value;
+    for(const k of [...f.c]){ const v = k.split(",").map(Number); if(v[i] >= f.n[i]) f.c.delete(k); }
+    if(layer >= f.n[1]) layer = f.n[1]-1;
+    changed(active);
+  });
+});
+
+function setActive(k){
+  active = k;
+  layer = Math.min(layer, figs[k].n[1]-1);
+  renderEditor();
+  save();
+}
+$("tabA").addEventListener("click", () => setActive("A"));
+$("tabB").addEventListener("click", () => setActive("B"));
+document.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => setActive(b.dataset.edit)));
+
+function renderEditor(){
+  const f = figs[active];
+  $("tabA").setAttribute("aria-pressed", active==="A");
+  $("tabB").setAttribute("aria-pressed", active==="B");
+  $("cardA").classList.toggle("active", active==="A");
+  $("cardB").classList.toggle("active", active==="B");
+  document.querySelector('[data-edit="A"]').textContent = active==="A" ? "Editando" : "Editar";
+  document.querySelector('[data-edit="B"]').textContent = active==="B" ? "Editando" : "Editar";
+  $("btnCopy").textContent = active==="A" ? "Copiar en B" : "Copiar en A";
+  $("dimX").value = f.n[0]; $("dimY").value = f.n[1]; $("dimZ").value = f.n[2];
+
+  const lv = $("levels"); lv.innerHTML = "";
+  for(let y=f.n[1]-1; y>=0; y--){
+    let cnt = 0; for(const k of f.c) if(k.split(",")[1] == y) cnt++;
+    const b = document.createElement("button");
+    b.setAttribute("aria-pressed", y===layer);
+    b.innerHTML = "<span>Nivel "+(y+1)+"</span><span>"+cnt+"</span>";
+    b.title = y===0 ? "Nivel del suelo" : "";
+    b.addEventListener("click", () => { layer = y; renderEditor(); });
+    lv.appendChild(b);
+  }
+
+  const g = $("grid"); g.innerHTML = "";
+  g.style.gridTemplateColumns = "repeat("+f.n[0]+", minmax(0, 46px))";
+  for(let z=0; z<f.n[2]; z++){
+    for(let x=0; x<f.n[0]; x++){
+      const k = x+","+layer+","+z;
+      const c = document.createElement("button");
+      c.className = "cell";
+      c.dataset.k = k;
+      const on = f.c.has(k);
+      if(on) c.classList.add("on");
+      else if(layer>0 && f.c.has(x+","+(layer-1)+","+z)) c.classList.add("below");
+      c.setAttribute("aria-pressed", on);
+      c.setAttribute("aria-label", "Columna "+(x+1)+", fila "+(z+1)+(on?", con cubo":", vacía"));
+      g.appendChild(c);
+    }
+  }
+  refreshViews();
+}
+
+// Pintar arrastrando
+(function(){
+  const g = $("grid");
+  let mode = null;
+  function paint(el){
+    if(!el || !el.classList || !el.classList.contains("cell")) return;
+    const f = figs[active], k = el.dataset.k;
+    if(mode && !f.c.has(k)) f.c.add(k);
+    else if(!mode && f.c.has(k)) f.c.delete(k);
+    else return;
+    el.classList.toggle("on", mode);
+    el.setAttribute("aria-pressed", mode);
+    if(!mode){
+      const [x,y,z] = k.split(",").map(Number);
+      el.classList.toggle("below", y>0 && f.c.has(x+","+(y-1)+","+z));
+    } else el.classList.remove("below");
+    changed(active, true);
+  }
+  g.addEventListener("pointerdown", e => {
+    const el = e.target.closest(".cell"); if(!el) return;
+    e.preventDefault();
+    mode = !figs[active].c.has(el.dataset.k);
+    try{ g.setPointerCapture(e.pointerId); }catch(_){}
+    paint(el);
+  });
+  g.addEventListener("pointermove", e => {
+    if(mode === null) return;
+    paint(document.elementFromPoint(e.clientX, e.clientY));
+  });
+  const stop = () => { if(mode !== null){ mode = null; renderEditor(); } };
+  g.addEventListener("pointerup", stop);
+  g.addEventListener("pointercancel", stop);
+  // Teclado
+  g.addEventListener("click", e => {
+    if(e.detail !== 0) return; // solo activación por teclado
+    const el = e.target.closest(".cell"); if(!el) return;
+    mode = !figs[active].c.has(el.dataset.k); paint(el); mode = null; renderEditor();
+  });
+})();
+
+function changed(k, light){
+  viewers[k].setFigure(figs[k], k === active ? layer : null);
+  $("count"+k).textContent = figs[k].c.size + (figs[k].c.size===1 ? " cubo" : " cubos");
+  $("empty"+k).hidden = figs[k].c.size > 0;
+  if(!light) renderEditor(); else { updateLevelCounts(); }
+  compare();
+  save();
+}
+function updateLevelCounts(){
+  const f = figs[active];
+  const btns = $("levels").querySelectorAll("button");
+  btns.forEach((b, i) => {
+    const y = f.n[1]-1-i; let cnt = 0;
+    for(const k of f.c) if(k.split(",")[1] == y) cnt++;
+    b.lastChild.textContent = cnt;
+  });
+}
+
+// Acciones
+$("btnClearLayer").addEventListener("click", () => {
+  const f = figs[active];
+  for(const k of [...f.c]) if(k.split(",")[1] == layer) f.c.delete(k);
+  changed(active);
+});
+$("btnClear").addEventListener("click", () => { figs[active].c.clear(); changed(active); });
+$("btnMirror").addEventListener("click", () => {
+  const f = figs[active];
+  f.c = new Set([...f.c].map(k => { const v = k.split(",").map(Number); return (f.n[0]-1-v[0])+","+v[1]+","+v[2]; }));
+  changed(active);
+});
+$("btnCopy").addEventListener("click", () => {
+  const other = active==="A" ? "B" : "A";
+  figs[other] = mkFig(figs[active].n, [...figs[active].c]);
+  changed(other); renderEditor();
+});
+$("btnSwap").addEventListener("click", () => {
+  const t = figs.A; figs.A = figs.B; figs.B = t;
+  layer = Math.min(layer, figs[active].n[1]-1);
+  changed("A"); changed("B");
+});
+
+// Veredicto
+let alignRot = null;
+function compare(){
+  const A = figs.A, B = figs.B;
+  const box = $("verdict"), title = $("vTitle"), text = $("vText");
+  alignRot = null;
+  let cls = "neutral", t = "", d = "";
+  if(!A.c.size || !B.c.size){
+    t = "Construye las dos figuras para compararlas.";
+    d = "El veredicto aparece aquí en cuanto A y B tengan cubos.";
+  } else if(A.c.size !== B.c.size){
+    cls = "bad"; t = "Son figuras distintas.";
+    d = "A tiene " + A.c.size + " cubos y B tiene " + B.c.size + ".";
+  } else {
+    const aKey = norm(pts(A));
+    const bPts = pts(B);
+    const r = findRot(bPts, aKey);
+    const mirrored = bPts.map(v => [-v[0], v[1], v[2]]);
+    const rm = findRot(mirrored, aKey);
+    if(r){
+      cls = "ok"; t = "B es la figura modelo girada.";
+      d = rm ? "Además, el modelo es simétrico: su imagen en espejo es la misma figura." : "Pulsa Orientar B como A para ver el giro.";
+      alignRot = r;
+    } else if(rm){
+      cls = "warn"; t = "B es la imagen en espejo del modelo.";
+      d = "Tiene la misma forma reflejada, así que no se puede conseguir girando la figura.";
+    } else {
+      cls = "bad"; t = "Son figuras distintas.";
+      d = "Tienen los mismos cubos, pero B no es el modelo girado ni reflejado.";
+    }
+  }
+  box.className = "panel verdict " + cls;
+  title.textContent = t; text.textContent = d;
+  $("btnAlign").hidden = !alignRot;
+}
+$("btnAlign").addEventListener("click", () => {
+  if(!alignRot) return;
+  const qA = viewers.A.anim ? viewers.A.anim.q1 : viewers.A.group.quaternion;
+  viewers.B.animateTo(qA.clone().multiply(rotQuat(alignRot)));
+});
+
+// Bucle de render
+function loop(now){ viewers.A.tick(now); viewers.B.tick(now); requestAnimationFrame(loop); }
+
+restore();
+changed("A"); changed("B");
+setActive(active);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
