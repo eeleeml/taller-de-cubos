@@ -142,6 +142,10 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .how h2{margin:0 0 6px;font-size:1rem;color:var(--ink);font-stretch:85%}
 .how ol{margin:0;padding-left:1.2em;max-width:75ch}
 .how li{margin:3px 0}
+[hidden]{display:none !important}
+.editbody{display:flex;flex-direction:column;gap:16px}
+.locked{margin:0;padding:12px;border:1.5px dashed var(--line);border-radius:5px;background:var(--cell);font-size:.9rem;color:var(--muted)}
+.btn.wide{width:100%;padding:10px 12px;font-size:.95rem}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 </head>
@@ -156,13 +160,16 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
     <!-- EDITOR -->
     <section class="panel editor" aria-label="Editor de figuras">
       <div>
-        <h2 style="margin-bottom:8px">Estás editando</h2>
+        <h2 style="margin-bottom:8px" id="editTitle">Estás editando</h2>
         <div class="seg" role="group" aria-label="Figura que editas">
           <button id="tabA" aria-pressed="true">Modelo (A)</button>
           <button id="tabB" aria-pressed="false">Opción (B)</button>
         </div>
       </div>
 
+      <p class="locked" id="editLocked" hidden>Las figuras están confirmadas: puedes girarlas y tocarlas sin cambiar nada. Para modificar una, pulsa Modelo (A) u Opción (B) aquí arriba, o Editar en su vista.</p>
+
+      <div class="editbody" id="editBody">
       <div class="dims">
         <label>Ancho<select id="dimX"></select></label>
         <label>Alto<select id="dimY"></select></label>
@@ -188,6 +195,9 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
         <button class="btn" id="btnMirror" title="Refleja la figura de izquierda a derecha">Reflejar</button>
         <button class="btn" id="btnCopy">Copiar en B</button>
         <button class="btn" id="btnSwap">Intercambiar A y B</button>
+      </div>
+
+      <button class="btn primary wide" id="btnConfirm" title="Deja de editar para girar la figura sin tocarla">Confirmar figura</button>
       </div>
 
     </section>
@@ -226,6 +236,7 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
     <ol>
       <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
       <li>Pasa a B y construye la opción que quieres comprobar. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
+      <li>Cuando termines una figura, pulsa Confirmar figura. Así la vista 3D la muestra entera y puedes girarla sin que vuelva al modo de edición. Para cambiarla otra vez, pulsa Editar.</li>
       <li>Arrastra cada vista para girarla libremente, o usa los botones para girar 90° sobre cada eje. Enderezar la devuelve a una posición alineada.</li>
       <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
     </ol>
@@ -265,7 +276,7 @@ function restore(){
     const a = decode(d.A), b = decode(d.B);
     if(a) figs.A = a;
     if(b) figs.B = b;
-    if(d.active === "A" || d.active === "B") active = d.active;
+    if(d.active === "A" || d.active === "B" || d.active === null) active = d.active;
   }catch(e){}
 }
 
@@ -497,8 +508,8 @@ const $ = id => document.getElementById(id);
 const viewers = { A: new Viewer($("viewA")), B: new Viewer($("viewB")) };
 ["A","B"].forEach(k => {
   viewers[k].onPick = key => {
-    if(active !== k){ setActive(k); return; }
-    if(!key) return;
+    // Solo se edita la figura activa; tocar otra vista (o una confirmada) no cambia de modo
+    if(active !== k || !key) return;
     const f = figs[k];
     if(f.c.has(key)) f.c.delete(key); else f.c.add(key);
     changed(k);
@@ -548,22 +559,27 @@ document.querySelectorAll(".vtools").forEach(bar => {
 
 function setActive(k){
   active = k;
-  layer = Math.min(layer, figs[k].n[1]-1);
+  if(k) layer = Math.min(layer, figs[k].n[1]-1);
   renderEditor();
   save();
 }
+$("btnConfirm").addEventListener("click", () => setActive(null));
 $("tabA").addEventListener("click", () => setActive("A"));
 $("tabB").addEventListener("click", () => setActive("B"));
 document.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => setActive(b.dataset.edit)));
 
 function renderEditor(){
-  const f = figs[active];
   $("tabA").setAttribute("aria-pressed", active==="A");
   $("tabB").setAttribute("aria-pressed", active==="B");
   $("cardA").classList.toggle("active", active==="A");
   $("cardB").classList.toggle("active", active==="B");
   document.querySelector('[data-edit="A"]').textContent = active==="A" ? "Editando" : "Editar";
   document.querySelector('[data-edit="B"]').textContent = active==="B" ? "Editando" : "Editar";
+  $("editTitle").textContent = active ? "Estás editando" : "Ninguna figura en edición";
+  $("editLocked").hidden = !!active;
+  $("editBody").hidden = !active;
+  if(!active){ refreshViews(); return; }
+  const f = figs[active];
   $("btnCopy").textContent = active==="A" ? "Copiar en B" : "Copiar en A";
   $("dimX").value = f.n[0]; $("dimY").value = f.n[1]; $("dimZ").value = f.n[2];
 
