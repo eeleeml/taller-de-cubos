@@ -143,6 +143,8 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .how ol{margin:0;padding-left:1.2em;max-width:75ch}
 .how li{margin:3px 0}
 [hidden]{display:none !important}
+.vtools .btn[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.angle{position:absolute;top:10px;left:12px;padding:3px 8px;border-radius:4px;background:var(--panel);border:1.5px solid currentColor;font-weight:700;font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none}
 .editbody{display:flex;flex-direction:column;gap:16px}
 .locked{margin:0;padding:12px;border:1.5px dashed var(--line);border-radius:5px;background:var(--cell);font-size:.9rem;color:var(--muted)}
 .btn.wide{width:100%;padding:10px 12px;font-size:.95rem}
@@ -237,7 +239,7 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
       <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
       <li>Pasa a B y construye la opción que quieres comprobar. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
       <li>Cuando termines una figura, pulsa Confirmar figura. Así la vista 3D la muestra entera y puedes girarla sin que vuelva al modo de edición. Para cambiarla otra vez, pulsa Editar.</li>
-      <li>Arrastra cada vista para girarla libremente, o usa los botones para girar 90° sobre cada eje. Enderezar la devuelve a una posición alineada.</li>
+      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): si sueltas cerca de un giro de 90°, se ajusta solo. Arrastrando fuera de los aros la giras libremente, y con los botones giras 90° de golpe. El botón Aros los muestra u oculta. Enderezar la devuelve a una posición alineada.</li>
       <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
     </ol>
   </section>
@@ -360,6 +362,9 @@ class Viewer{
     this.group = new THREE.Group(); this.scene.add(this.group);
     this.gizmo = this.makeGizmo(); this.scene.add(this.gizmo);
     this.radius = 2; this.anim = null; this.dirty = true;
+    this.rings = this.makeRings(); this.ringsOn = true; this.hoverRing = null; this.drag = null;
+    this.angleLabel = document.createElement("div"); this.angleLabel.className = "angle"; this.angleLabel.hidden = true;
+    el.appendChild(this.angleLabel);
     this.ray = new THREE.Raycaster(); this.pickables = []; this.onPick = null; this.n = [1,1,1]; this.editLayer = null;
     this.bindDrag();
     if(window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(el);
@@ -371,6 +376,90 @@ class Viewer{
     [[new THREE.Vector3(1,0,0),0xD9534F],[new THREE.Vector3(0,1,0),0x2E9E5B],[new THREE.Vector3(0,0,1),0x3B6FD8]]
       .forEach(([d,c]) => g.add(new THREE.ArrowHelper(d, o, 1, c, 0.3, 0.18)));
     return g;
+  }
+  /* Aros de giro: uno por eje, fijos respecto a la cámara como las flechas de la esquina */
+  makeRings(){
+    const g = new THREE.Group();
+    g.renderOrder = 10;
+    this.ringList = [
+      {name:"X", axis:new THREE.Vector3(1,0,0), color:0xD9534F, css:"#D9534F", rot:[0, Math.PI/2, 0]},
+      {name:"Y", axis:new THREE.Vector3(0,1,0), color:0x2E9E5B, css:"#2E9E5B", rot:[Math.PI/2, 0, 0]},
+      {name:"Z", axis:new THREE.Vector3(0,0,1), color:0x3B6FD8, css:"#3B6FD8", rot:[0, 0, 0]}
+    ];
+    for(const r of this.ringList){
+      r.mat = new THREE.MeshBasicMaterial({color:r.color, transparent:true, opacity:0.75, depthTest:false, depthWrite:false});
+      r.mesh = new THREE.Mesh(undefined, r.mat); r.mesh.renderOrder = 10;
+      r.hit = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial({visible:false}));
+      r.hit.userData.ring = r;
+      for(const m of [r.mesh, r.hit]){ m.rotation.set(r.rot[0], r.rot[1], r.rot[2]); g.add(m); }
+    }
+    this.scene.add(g);
+    return g;
+  }
+  updateRings(){
+    const R = this.radius*1.12;
+    for(const r of this.ringList){
+      for(const gm of [r.thin, r.thick, r.hit.geometry]) if(gm) gm.dispose();
+      r.thin = new THREE.TorusGeometry(R, R*0.018, 8, 120);
+      r.thick = new THREE.TorusGeometry(R, R*0.04, 8, 120);
+      r.hit.geometry = new THREE.TorusGeometry(R, R*0.09, 6, 64);
+    }
+    this.paintRings();
+  }
+  paintRings(){
+    this.rings.visible = this.ringsOn && this.hasCubes;
+    const act = this.drag && this.drag.active ? this.drag.ring : null;
+    for(const r of this.ringList){
+      const hot = act ? r === act : r === this.hoverRing;
+      r.mesh.geometry = hot ? r.thick : r.thin;
+      r.mat.opacity = act ? (hot ? 1 : 0.18) : (hot ? 1 : 0.75);
+    }
+    this.dirty = true;
+  }
+  setRings(on){ this.ringsOn = on; this.hoverRing = null; this.paintRings(); }
+  ndc(e){
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return new THREE.Vector2(((e.clientX - r.left)/r.width)*2 - 1, -((e.clientY - r.top)/r.height)*2 + 1);
+  }
+  ringAt(e){
+    if(!this.ringsOn || !this.hasCubes) return null;
+    this.ray.setFromCamera(this.ndc(e), this.cam);
+    const hits = this.ray.intersectObjects(this.ringList.map(r => r.hit), false);
+    if(!hits.length) return null;
+    const r = hits[0].object.userData.ring;
+    // Punto del aro más cercano al impacto
+    const p = hits[0].point.clone();
+    p.sub(r.axis.clone().multiplyScalar(p.dot(r.axis)));
+    if(p.lengthSq() < 1e-9) return null;
+    p.setLength(this.radius*1.12);
+    return {ring:r, point:p};
+  }
+  toScreen(v){
+    const p = v.clone().project(this.cam);
+    return new THREE.Vector2((p.x+1)/2*this.el.clientWidth, (1-p.y)/2*this.el.clientHeight);
+  }
+  ringDrag(dx, dy){
+    const d = this.drag, r = d.ring;
+    // Cuánto se mueve en pantalla el punto agarrado por cada radián de giro
+    const eps = 0.01;
+    const s = this.toScreen(d.point.clone().applyAxisAngle(r.axis, eps)).sub(this.toScreen(d.point)).divideScalar(eps);
+    const rPx = this.radius*1.12 / (this.cam.right - this.cam.left) * this.el.clientWidth;
+    const minMag = rPx*0.35;
+    if(s.length() < 1e-6) s.set(minMag, 0);
+    else if(s.length() < minMag) s.setLength(minMag);
+    const da = (dx*s.x + dy*s.y) / s.lengthSq();
+    d.total += da;
+    d.point.applyAxisAngle(r.axis, da);
+    this.group.quaternion.copy(new THREE.Quaternion().setFromAxisAngle(r.axis, d.total).multiply(d.q0));
+    this.showAngle(r, d.total);
+    this.dirty = true;
+  }
+  showAngle(r, a){
+    const deg = Math.round(a*180/Math.PI);
+    this.angleLabel.textContent = "Eje " + r.name + ": " + (deg > 0 ? "+" : "") + deg + "°";
+    this.angleLabel.style.color = r.css;
+    this.angleLabel.hidden = false;
+    clearTimeout(this.angleTimer);
   }
   setFigure(f, editLayer){
     while(this.group.children.length){
@@ -408,13 +497,15 @@ class Viewer{
       this.group.add(bar);
     }
     this.radius = 0.5*Math.sqrt(f.n[0]**2 + f.n[1]**2 + f.n[2]**2);
+    this.hasCubes = f.c.size > 0;
+    this.updateRings();
     this.resize();
   }
   resize(){
     const w = this.el.clientWidth, h = this.el.clientHeight;
     if(!w || !h) return;
     this.renderer.setSize(w, h, false);
-    const s = Math.max(2.6, this.radius*2*1.12);
+    const s = Math.max(2.6, this.radius*2*1.3);
     const asp = w/h;
     let hw, hh;
     if(asp >= 1){ hh = s/2; hw = hh*asp; } else { hw = s/2; hh = hw/asp; }
@@ -433,16 +524,28 @@ class Viewer{
     el.addEventListener("pointerdown", e => {
       if(e.button !== undefined && e.button !== 0) return;
       id = e.pointerId; last = [e.clientX, e.clientY]; start = last.slice(); moved = false;
+      const hit = this.ringAt(e);
+      this.drag = hit ? {ring:hit.ring, point:hit.point, total:0, q0:null, active:false} : null;
       try{ el.setPointerCapture(id); }catch(_){}
     });
     el.addEventListener("pointermove", e => {
+      if(id === null){
+        // Resaltar el aro bajo el ratón
+        const hit = e.pointerType === "mouse" ? this.ringAt(e) : null;
+        const r = hit ? hit.ring : null;
+        if(r !== this.hoverRing){ this.hoverRing = r; el.style.cursor = r ? "pointer" : ""; this.paintRings(); }
+        return;
+      }
       if(e.pointerId !== id || !last) return;
       if(!moved){
         if(Math.hypot(e.clientX - start[0], e.clientY - start[1]) < 6) return;
-        moved = true; this.anim = null;
+        moved = true;
+        if(this.anim){ this.group.quaternion.copy(this.anim.q1); this.anim = null; }
+        if(this.drag){ this.drag.q0 = this.group.quaternion.clone(); this.drag.active = true; this.paintRings(); }
       }
       const dx = e.clientX - last[0], dy = e.clientY - last[1];
       last = [e.clientX, e.clientY];
+      if(this.drag){ this.ringDrag(dx, dy); return; }
       const right = new THREE.Vector3(1,0,0).applyQuaternion(this.cam.quaternion);
       const up = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
       const qa = new THREE.Quaternion().setFromAxisAngle(up, dx*0.012);
@@ -453,9 +556,29 @@ class Viewer{
     el.addEventListener("pointerup", e => {
       if(e.pointerId !== id) return;
       if(!moved) this.pick(e);
+      else if(this.drag) this.endRingDrag();
+      this.drag = null; this.paintRings();
       last = null; id = null;
     });
-    el.addEventListener("pointercancel", e => { if(e.pointerId === id){ last = null; id = null; } });
+    el.addEventListener("pointercancel", e => {
+      if(e.pointerId !== id) return;
+      if(moved && this.drag) this.endRingDrag();
+      this.drag = null; this.paintRings();
+      last = null; id = null;
+    });
+    el.addEventListener("pointerleave", () => {
+      if(id === null && this.hoverRing){ this.hoverRing = null; el.style.cursor = ""; this.paintRings(); }
+    });
+  }
+  endRingDrag(){
+    // Si se suelta cerca de un múltiplo de 90°, se ajusta a él
+    const d = this.drag, q90 = Math.PI/2;
+    const k = Math.round(d.total/q90)*q90;
+    if(Math.abs(d.total - k) < 12*Math.PI/180){
+      this.animateTo(new THREE.Quaternion().setFromAxisAngle(d.ring.axis, k).multiply(d.q0));
+      this.showAngle(d.ring, k);
+    }
+    this.angleTimer = setTimeout(() => { this.angleLabel.hidden = true; }, 1200);
   }
   pick(e){
     if(!this.onPick) return;
@@ -541,7 +664,15 @@ document.querySelectorAll(".vtools").forEach(bar => {
   const r = document.createElement("button");
   r.className = "btn"; r.textContent = "Restablecer"; r.title = "Vuelve a la vista inicial";
   r.addEventListener("click", () => viewers[k].reset());
-  bar.append(s, r);
+  const t = document.createElement("button");
+  t.className = "btn"; t.textContent = "Aros"; t.title = "Muestra u oculta los aros: arrastra un aro para girar solo sobre su eje";
+  t.setAttribute("aria-pressed", "true");
+  t.addEventListener("click", () => {
+    const on = t.getAttribute("aria-pressed") !== "true";
+    t.setAttribute("aria-pressed", on);
+    viewers[k].setRings(on);
+  });
+  bar.append(s, r, t);
 });
 
 // Selectores de tamaño
