@@ -143,7 +143,10 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .how ol{margin:0;padding-left:1.2em;max-width:75ch}
 .how li{margin:3px 0}
 [hidden]{display:none !important}
-.vtools .btn[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.btn[aria-pressed="true"]:hover{background:var(--ink);opacity:.9}
+.stagebar{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.stagebar .hint{flex:1 1 260px}
 .angle{position:absolute;top:10px;left:12px;padding:3px 8px;border-radius:4px;background:var(--panel);border:1.5px solid currentColor;font-weight:700;font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none}
 .editbody{display:flex;flex-direction:column;gap:16px}
 .locked{margin:0;padding:12px;border:1.5px dashed var(--line);border-radius:5px;background:var(--cell);font-size:.9rem;color:var(--muted)}
@@ -206,6 +209,10 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 
     <!-- STAGE -->
     <section class="stage" aria-label="Vista 3D">
+      <div class="stagebar">
+        <button class="btn" id="btnLink" aria-pressed="false" title="Al girar una vista, la otra hace el mismo giro">Girar A y B juntas</button>
+        <p class="hint">Arrastra para girar · rueda o pellizco para acercar · doble clic para enderezar · toca el cubo de la esquina para ver desde un lado</p>
+      </div>
       <article class="panel viewer active" id="cardA">
         <div class="vhead">
           <h3>Modelo (A)</h3>
@@ -239,7 +246,9 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
       <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
       <li>Pasa a B y construye la opción que quieres comprobar. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
       <li>Cuando termines una figura, pulsa Confirmar figura. Así la vista 3D la muestra entera y puedes girarla sin que vuelva al modo de edición. Para cambiarla otra vez, pulsa Editar.</li>
-      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): si sueltas cerca de un giro de 90°, se ajusta solo. Arrastrando fuera de los aros la giras libremente, y con los botones giras 90° de golpe. El botón Aros los muestra u oculta. Enderezar la devuelve a una posición alineada.</li>
+      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): si sueltas cerca de un giro de 90°, se ajusta solo. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Con los botones (o las flechas del teclado) giras 90° de golpe, y Enderezar la devuelve a una posición alineada. El botón Aros los muestra u oculta.</li>
+      <li>El cubo de la esquina gira con la figura. Toca una de sus caras (Frente, Arriba, Derecha…) para ver la figura justo desde ese lado, o una arista o esquina para verla en diagonal. Con la rueda del ratón o pellizcando la acercas, y con doble clic la enderezas.</li>
+      <li>Activa Girar A y B juntas para que al girar una vista la otra haga exactamente el mismo giro. Pon antes las dos en la misma postura con Orientar B como A y explóralas a la vez.</li>
       <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
     </ol>
   </section>
@@ -345,12 +354,31 @@ const layerMat = new THREE.MeshBasicMaterial({color:0xF2C230, transparent:true, 
 const layerLineMat = new THREE.LineBasicMaterial({color:0xB8860B, transparent:true, opacity:0.85});
 const frontMat = new THREE.MeshBasicMaterial({color:0xE8890C});
 
+// Girar A y B a la vez (lo cambia el botón de la barra de vistas)
+let linkOn = false;
+const DEG = Math.PI/180;
+
+function faceTexture(label, accent){
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#F4F7FB"; g.fillRect(0,0,128,128);
+  if(accent){ g.fillStyle = "#E8890C"; g.fillRect(0,112,128,16); }
+  g.fillStyle = "#1B2740"; g.font = "700 19px system-ui, 'Segoe UI', Roboto, sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(label, 64, accent ? 58 : 64);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  return t;
+}
+
 class Viewer{
   constructor(el){
     this.el = el;
     this.renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
     this.renderer.setClearColor(0x000000, 0);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.insertBefore(this.renderer.domElement, el.firstChild);
     this.scene = new THREE.Scene();
     this.cam = new THREE.OrthographicCamera(-1,1,1,-1,0.1,200);
@@ -359,28 +387,72 @@ class Viewer{
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.58));
     const d1 = new THREE.DirectionalLight(0xffffff, 0.62); d1.position.set(2, 10, 4); this.scene.add(d1);
     const d2 = new THREE.DirectionalLight(0xffffff, 0.22); d2.position.set(-6, 1, 3); this.scene.add(d2);
+    // Luz solo para la sombra del suelo: casi vertical para que la sombra quede debajo
+    this.sun = new THREE.DirectionalLight(0xffffff, 0);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(1024, 1024);
+    this.sun.shadow.bias = -0.002;
+    this.scene.add(this.sun);
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(1,1), new THREE.ShadowMaterial({opacity:0.22}));
+    this.floor.rotation.x = -Math.PI/2; this.floor.receiveShadow = true;
+    this.scene.add(this.floor);
+
     this.group = new THREE.Group(); this.scene.add(this.group);
-    this.gizmo = this.makeGizmo(); this.scene.add(this.gizmo);
-    this.radius = 2; this.anim = null; this.dirty = true;
-    this.rings = this.makeRings(); this.ringsOn = true; this.hoverRing = null; this.drag = null;
+    this.vcube = this.makeViewCube(); this.scene.add(this.vcube);
+    this.radius = 2; this.zoom = 1; this.anim = null; this.spin = null; this.dirty = true; this.peer = null;
+    this.rings = this.makeRings(); this.ringsOn = true; this.hoverRing = null; this.hoverFace = -1; this.drag = null;
     this.angleLabel = document.createElement("div"); this.angleLabel.className = "angle"; this.angleLabel.hidden = true;
     el.appendChild(this.angleLabel);
     this.ray = new THREE.Raycaster(); this.pickables = []; this.onPick = null; this.n = [1,1,1]; this.editLayer = null;
     this.bindDrag();
+    this.bindKeys();
     if(window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(el);
     else window.addEventListener("resize", () => this.resize());
   }
-  makeGizmo(){
-    const g = new THREE.Group();
-    const o = new THREE.Vector3(0,0,0);
-    [[new THREE.Vector3(1,0,0),0xD9534F],[new THREE.Vector3(0,1,0),0x2E9E5B],[new THREE.Vector3(0,0,1),0x3B6FD8]]
-      .forEach(([d,c]) => g.add(new THREE.ArrowHelper(d, o, 1, c, 0.3, 0.18)));
-    return g;
+
+  /* ---- Cubo de vistas: gira con la figura; al tocar una cara, arista o esquina, la figura se coloca así ---- */
+  makeViewCube(){
+    const labels = [["DERECHA"],["IZQUIERDA"],["ARRIBA"],["ABAJO"],["FRENTE",true],["ATRÁS"]];
+    this.cubeMats = labels.map(([t,a]) => new THREE.MeshLambertMaterial({map:faceTexture(t,a)}));
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), this.cubeMats);
+    m.add(new THREE.LineSegments(edgeGeo, edgeMat));
+    m.renderOrder = 20;
+    return m;
   }
-  /* Aros de giro: uno por eje, fijos respecto a la cámara como las flechas de la esquina */
+  cubeAt(e){
+    this.ray.setFromCamera(this.ndc(e), this.cam);
+    const hits = this.ray.intersectObject(this.vcube, false);
+    if(!hits.length) return null;
+    const p = this.vcube.worldToLocal(hits[0].point.clone());
+    // Cerca del borde de una cara cuenta también el eje vecino: arista o esquina
+    const n = new THREE.Vector3(
+      Math.abs(p.x) > 0.3 ? Math.sign(p.x) : 0,
+      Math.abs(p.y) > 0.3 ? Math.sign(p.y) : 0,
+      Math.abs(p.z) > 0.3 ? Math.sign(p.z) : 0);
+    if(n.lengthSq() === 0) return null;
+    return {normal:n.normalize(), face:hits[0].face.materialIndex};
+  }
+  paintCube(){
+    this.cubeMats.forEach((m, i) => m.color.set(i === this.hoverFace ? 0xFFE08A : 0xFFFFFF));
+    this.dirty = true;
+  }
+  // Orientación en la que la dirección local n mira a la cámara, con la figura lo más derecha posible
+  goToView(n){
+    const D = this.cam.position.clone().normalize();
+    const U = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
+    let u0;
+    if(Math.abs(n.y) > 0.99) u0 = new THREE.Vector3(0, 0, n.y > 0 ? -1 : 1);
+    else u0 = new THREE.Vector3(0,1,0);
+    const u = u0.clone().sub(n.clone().multiplyScalar(u0.dot(n))).normalize();
+    const Ml = new THREE.Matrix4().makeBasis(n, u, n.clone().cross(u));
+    const Mw = new THREE.Matrix4().makeBasis(D, U, D.clone().cross(U));
+    const q = new THREE.Quaternion().setFromRotationMatrix(Mw.multiply(Ml.transpose()));
+    this.animateTo(q);
+  }
+
+  /* ---- Aros de giro: uno por eje, fijos respecto a la cámara ---- */
   makeRings(){
     const g = new THREE.Group();
-    g.renderOrder = 10;
     this.ringList = [
       {name:"X", axis:new THREE.Vector3(1,0,0), color:0xD9534F, css:"#D9534F", rot:[0, Math.PI/2, 0]},
       {name:"Y", axis:new THREE.Vector3(0,1,0), color:0x2E9E5B, css:"#2E9E5B", rot:[Math.PI/2, 0, 0]},
@@ -450,17 +522,28 @@ class Viewer{
     const da = (dx*s.x + dy*s.y) / s.lengthSq();
     d.total += da;
     d.point.applyAxisAngle(r.axis, da);
-    this.group.quaternion.copy(new THREE.Quaternion().setFromAxisAngle(r.axis, d.total).multiply(d.q0));
+    const target = new THREE.Quaternion().setFromAxisAngle(r.axis, d.total).multiply(d.q0);
+    this.turn(target.multiply(this.group.quaternion.clone().conjugate()));
     this.showAngle(r, d.total);
-    this.dirty = true;
   }
   showAngle(r, a){
-    const deg = Math.round(a*180/Math.PI);
+    const deg = Math.round(a/DEG);
     this.angleLabel.textContent = "Eje " + r.name + ": " + (deg > 0 ? "+" : "") + deg + "°";
     this.angleLabel.style.color = r.css;
     this.angleLabel.hidden = false;
     clearTimeout(this.angleTimer);
   }
+  endRingDrag(){
+    // Si se suelta cerca de un múltiplo de 90°, se ajusta a él
+    const d = this.drag, q90 = Math.PI/2;
+    const k = Math.round(d.total/q90)*q90;
+    if(Math.abs(d.total - k) < 12*DEG){
+      this.animateTo(new THREE.Quaternion().setFromAxisAngle(d.ring.axis, k).multiply(d.q0));
+      this.showAngle(d.ring, k);
+    }
+    this.angleTimer = setTimeout(() => { this.angleLabel.hidden = true; }, 1200);
+  }
+
   setFigure(f, editLayer){
     while(this.group.children.length){
       const c = this.group.children[0];
@@ -476,7 +559,7 @@ class Viewer{
       const m = new THREE.Mesh(boxGeo, above ? ghostMat : cubeMat);
       m.position.set(v[0]-ctr[0], v[1]-ctr[1], v[2]-ctr[2]);
       m.add(new THREE.LineSegments(edgeGeo, above ? ghostEdgeMat : edgeMat));
-      if(above) m.renderOrder = 2;
+      if(above) m.renderOrder = 2; else m.castShadow = true;
       if(v[1] === this.editLayer){ m.userData.k = v.join(","); this.pickables.push(m); }
       this.group.add(m);
     }
@@ -498,6 +581,14 @@ class Viewer{
     }
     this.radius = 0.5*Math.sqrt(f.n[0]**2 + f.n[1]**2 + f.n[2]**2);
     this.hasCubes = f.c.size > 0;
+    // Suelo de sombra justo debajo de la esfera que envuelve la figura
+    const R = this.radius;
+    this.floor.scale.set(R*5, R*5, 1);
+    this.floor.position.y = -R*1.02;
+    this.sun.position.set(0.5, 10, 1).setLength(R*4);
+    const sc = this.sun.shadow.camera;
+    Object.assign(sc, {left:-R*1.6, right:R*1.6, top:R*1.6, bottom:-R*1.6, near:0.1, far:R*8});
+    sc.updateProjectionMatrix();
     this.updateRings();
     this.resize();
   }
@@ -505,87 +596,201 @@ class Viewer{
     const w = this.el.clientWidth, h = this.el.clientHeight;
     if(!w || !h) return;
     this.renderer.setSize(w, h, false);
-    const s = Math.max(2.6, this.radius*2*1.3);
+    const s = Math.max(2.6, this.radius*2*1.3) / this.zoom;
     const asp = w/h;
     let hw, hh;
     if(asp >= 1){ hh = s/2; hw = hh*asp; } else { hw = s/2; hh = hw/asp; }
     Object.assign(this.cam, {left:-hw, right:hw, top:hh, bottom:-hh});
     this.cam.updateProjectionMatrix();
+    // El cubo de vistas mide siempre lo mismo en pantalla y va delante de todo
     const k = s/7.5;
-    this.gizmo.scale.setScalar(k);
+    this.vcube.scale.setScalar(k*1.35);
     const right = new THREE.Vector3(1,0,0).applyQuaternion(this.cam.quaternion);
     const up = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
-    this.gizmo.position.copy(right.multiplyScalar(-hw + 0.85*k)).add(up.multiplyScalar(-hh + 0.6*k));
+    const toCam = this.cam.position.clone().normalize();
+    this.vcube.position.copy(right.multiplyScalar(-hw + 1.3*k))
+      .add(up.multiplyScalar(-hh + 1.3*k))
+      .add(toCam.multiplyScalar(this.radius*2 + 2));
     this.dirty = true;
   }
+  setZoom(z){
+    this.zoom = Math.min(4, Math.max(0.6, z));
+    this.resize();
+  }
+
+  /* ---- Giros: todo pasa por turn() o animateTo() para que la otra vista pueda seguirlos ---- */
+  settle(){
+    if(this.anim){ this.group.quaternion.copy(this.anim.q1); this.anim = null; }
+    this.spin = null;
+    this.dirty = true;
+  }
+  turn(dq){
+    this.group.quaternion.premultiply(dq).normalize();
+    this.dirty = true;
+    if(linkOn && this.peer){
+      const p = this.peer;
+      if(p.anim || p.spin) p.settle();
+      p.group.quaternion.premultiply(dq).normalize();
+      p.dirty = true;
+    }
+  }
+  freeDelta(dx, dy){
+    const right = new THREE.Vector3(1,0,0).applyQuaternion(this.cam.quaternion);
+    const up = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
+    const qa = new THREE.Quaternion().setFromAxisAngle(up, dx*0.012);
+    const qb = new THREE.Quaternion().setFromAxisAngle(right, dy*0.012);
+    return qb.multiply(qa);
+  }
+  target(){ return this.anim ? this.anim.q1 : this.group.quaternion; }
+  animateTo(q1, solo){
+    if(!solo && linkOn && this.peer){
+      const delta = q1.clone().multiply(this.target().clone().conjugate());
+      this.peer.animateTo(delta.multiply(this.peer.target()), true);
+    }
+    this.spin = null;
+    if(reduceMotion){ this.anim = null; this.group.quaternion.copy(q1); this.dirty = true; return; }
+    this.anim = {q0:this.group.quaternion.clone(), q1:q1.clone(), t0:performance.now(), dur:380};
+  }
+  rotate(axis, sign){
+    const ax = new THREE.Vector3(axis==="x"?1:0, axis==="y"?1:0, axis==="z"?1:0);
+    this.animateTo(new THREE.Quaternion().setFromAxisAngle(ax, (sign||1)*Math.PI/2).multiply(this.target()));
+  }
+  nearestAligned(){
+    const cur = this.target();
+    let best = SNAP_QUATS[0], bd = -1;
+    for(const q of SNAP_QUATS){ const d = Math.abs(cur.dot(q)); if(d > bd){ bd = d; best = q; } }
+    return {q:best, angle:2*Math.acos(Math.min(1, bd))};
+  }
+  snap(){ this.animateTo(this.nearestAligned().q); }
+  // Imán: si al soltar queda cerca de una posición recta, se coloca en ella
+  magnet(){
+    const n = this.nearestAligned();
+    if(n.angle > 1e-3 && n.angle < 20*DEG) this.animateTo(n.q);
+  }
+  reset(){ this.animateTo(new THREE.Quaternion()); this.setZoom(1); }
+
   bindDrag(){
     const el = this.el;
-    let last = null, start = null, id = null, moved = false;
+    const pointers = new Map();
+    let last = null, start = null, id = null, moved = false, pinch = null;
+    let vx = 0, vy = 0, lastT = 0, cubeHit = null, lastTap = null;
+    const endGesture = () => { this.drag = null; this.paintRings(); last = null; id = null; cubeHit = null; };
+
     el.addEventListener("pointerdown", e => {
       if(e.button !== undefined && e.button !== 0) return;
+      pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      try{ el.setPointerCapture(e.pointerId); }catch(_){}
+      if(pointers.size === 2){
+        // Dos dedos: pellizco para acercar o alejar; se abandona el giro en curso
+        const [a, b] = [...pointers.values()];
+        pinch = {d0: Math.hypot(a[0]-b[0], a[1]-b[1]) || 1, z0: this.zoom};
+        endGesture();
+        return;
+      }
+      if(pointers.size > 2 || pinch) return;
+      this.spin = null;
+      if(linkOn && this.peer) this.peer.spin = null;
       id = e.pointerId; last = [e.clientX, e.clientY]; start = last.slice(); moved = false;
-      const hit = this.ringAt(e);
+      vx = vy = 0; lastT = e.timeStamp;
+      cubeHit = this.cubeAt(e);
+      const hit = cubeHit ? null : this.ringAt(e);
       this.drag = hit ? {ring:hit.ring, point:hit.point, total:0, q0:null, active:false} : null;
-      try{ el.setPointerCapture(id); }catch(_){}
     });
+
     el.addEventListener("pointermove", e => {
+      if(pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      if(pinch){
+        if(pointers.size === 2){
+          const [a, b] = [...pointers.values()];
+          this.setZoom(pinch.z0 * Math.hypot(a[0]-b[0], a[1]-b[1]) / pinch.d0);
+        }
+        return;
+      }
       if(id === null){
-        // Resaltar el aro bajo el ratón
-        const hit = e.pointerType === "mouse" ? this.ringAt(e) : null;
-        const r = hit ? hit.ring : null;
-        if(r !== this.hoverRing){ this.hoverRing = r; el.style.cursor = r ? "pointer" : ""; this.paintRings(); }
+        // Resaltar con el ratón lo que se puede agarrar
+        if(e.pointerType !== "mouse") return;
+        const c = this.cubeAt(e);
+        const hit = c ? null : this.ringAt(e);
+        const r = hit ? hit.ring : null, f = c ? c.face : -1;
+        if(r !== this.hoverRing){ this.hoverRing = r; this.paintRings(); }
+        if(f !== this.hoverFace){ this.hoverFace = f; this.paintCube(); }
+        el.style.cursor = (r || c) ? "pointer" : "";
         return;
       }
       if(e.pointerId !== id || !last) return;
       if(!moved){
         if(Math.hypot(e.clientX - start[0], e.clientY - start[1]) < 6) return;
-        moved = true;
-        if(this.anim){ this.group.quaternion.copy(this.anim.q1); this.anim = null; }
+        moved = true; cubeHit = null;
+        this.settle();
+        if(linkOn && this.peer) this.peer.settle();
         if(this.drag){ this.drag.q0 = this.group.quaternion.clone(); this.drag.active = true; this.paintRings(); }
       }
       const dx = e.clientX - last[0], dy = e.clientY - last[1];
       last = [e.clientX, e.clientY];
       if(this.drag){ this.ringDrag(dx, dy); return; }
-      const right = new THREE.Vector3(1,0,0).applyQuaternion(this.cam.quaternion);
-      const up = new THREE.Vector3(0,1,0).applyQuaternion(this.cam.quaternion);
-      const qa = new THREE.Quaternion().setFromAxisAngle(up, dx*0.012);
-      const qb = new THREE.Quaternion().setFromAxisAngle(right, dy*0.012);
-      this.group.quaternion.premultiply(qa).premultiply(qb);
-      this.dirty = true;
+      // Velocidad suavizada, para la inercia al soltar
+      const dt = Math.max(1, e.timeStamp - lastT); lastT = e.timeStamp;
+      vx = 0.6*vx + 0.4*(dx/dt); vy = 0.6*vy + 0.4*(dy/dt);
+      this.turn(this.freeDelta(dx, dy));
     });
-    el.addEventListener("pointerup", e => {
+
+    const up = e => {
+      pointers.delete(e.pointerId);
+      if(pinch){ if(pointers.size === 0) pinch = null; return; }
       if(e.pointerId !== id) return;
-      if(!moved) this.pick(e);
-      else if(this.drag) this.endRingDrag();
-      this.drag = null; this.paintRings();
-      last = null; id = null;
-    });
-    el.addEventListener("pointercancel", e => {
-      if(e.pointerId !== id) return;
-      if(moved && this.drag) this.endRingDrag();
-      this.drag = null; this.paintRings();
-      last = null; id = null;
-    });
+      if(!moved){
+        if(cubeHit){ this.goToView(cubeHit.normal); endGesture(); return; }
+        if(this.editLayer === null && e.type === "pointerup"){
+          // Doble toque o doble clic: enderezar
+          if(lastTap && e.timeStamp - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24){
+            this.snap(); lastTap = null;
+          } else lastTap = {t:e.timeStamp, x:e.clientX, y:e.clientY};
+        }
+        if(e.type === "pointerup") this.pick(e);
+      } else if(this.drag){
+        this.endRingDrag();
+      } else {
+        // Inercia: si se suelta en movimiento, sigue girando y frena; luego actúa el imán
+        if(e.timeStamp - lastT > 70){ vx = vy = 0; }
+        const sp = Math.hypot(vx, vy), cap = 0.6;
+        if(sp > cap){ vx *= cap/sp; vy *= cap/sp; }
+        if(sp > 0.25 && !reduceMotion) this.spin = {vx, vy};
+        else this.magnet();
+      }
+      endGesture();
+    };
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
     el.addEventListener("pointerleave", () => {
-      if(id === null && this.hoverRing){ this.hoverRing = null; el.style.cursor = ""; this.paintRings(); }
+      if(id !== null) return;
+      if(this.hoverRing){ this.hoverRing = null; this.paintRings(); }
+      if(this.hoverFace !== -1){ this.hoverFace = -1; this.paintCube(); }
+      el.style.cursor = "";
     });
+    el.addEventListener("wheel", e => {
+      e.preventDefault();
+      this.setZoom(this.zoom * Math.exp(-e.deltaY*0.0015));
+    }, {passive:false});
   }
-  endRingDrag(){
-    // Si se suelta cerca de un múltiplo de 90°, se ajusta a él
-    const d = this.drag, q90 = Math.PI/2;
-    const k = Math.round(d.total/q90)*q90;
-    if(Math.abs(d.total - k) < 12*Math.PI/180){
-      this.animateTo(new THREE.Quaternion().setFromAxisAngle(d.ring.axis, k).multiply(d.q0));
-      this.showAngle(d.ring, k);
-    }
-    this.angleTimer = setTimeout(() => { this.angleLabel.hidden = true; }, 1200);
+  bindKeys(){
+    const el = this.el;
+    el.tabIndex = 0;
+    el.addEventListener("keydown", e => {
+      const keys = {
+        ArrowLeft: () => this.rotate("y", -1), ArrowRight: () => this.rotate("y", 1),
+        ArrowUp: () => this.rotate("x", -1), ArrowDown: () => this.rotate("x", 1),
+        "+": () => this.setZoom(this.zoom*1.2), "=": () => this.setZoom(this.zoom*1.2),
+        "-": () => this.setZoom(this.zoom/1.2), Home: () => this.reset()
+      };
+      const f = keys[e.key];
+      if(!f || e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault(); f();
+    });
   }
   pick(e){
     if(!this.onPick) return;
     if(this.editLayer === null){ this.onPick(null); return; }
-    const r = this.renderer.domElement.getBoundingClientRect();
-    const ndc = new THREE.Vector2(((e.clientX - r.left)/r.width)*2 - 1, -((e.clientY - r.top)/r.height)*2 + 1);
-    this.ray.setFromCamera(ndc, this.cam);
+    this.ray.setFromCamera(this.ndc(e), this.cam);
     const hits = this.ray.intersectObjects(this.pickables, false);
     if(!hits.length) return;
     const h = hits[0];
@@ -595,26 +800,14 @@ class Viewer{
     if(x < 0 || z < 0 || x >= this.n[0] || z >= this.n[2]) return;
     this.onPick(x + "," + this.editLayer + "," + z);
   }
-  animateTo(q1){
-    const q0 = this.group.quaternion.clone();
-    if(reduceMotion){ this.group.quaternion.copy(q1); this.dirty = true; return; }
-    this.anim = {q0, q1:q1.clone(), t0:performance.now(), dur:380};
-  }
-  rotate(axis){
-    const cur = this.anim ? this.anim.q1.clone() : this.group.quaternion.clone();
-    const ax = new THREE.Vector3(axis==="x"?1:0, axis==="y"?1:0, axis==="z"?1:0);
-    const q = new THREE.Quaternion().setFromAxisAngle(ax, Math.PI/2).multiply(cur);
-    if(this.anim){ this.group.quaternion.copy(this.anim.q1); }
-    this.animateTo(q);
-  }
-  snap(){
-    const cur = this.group.quaternion;
-    let best = SNAP_QUATS[0], bd = -1;
-    for(const q of SNAP_QUATS){ const d = Math.abs(cur.dot(q)); if(d > bd){ bd = d; best = q; } }
-    this.animateTo(best);
-  }
-  reset(){ this.animateTo(new THREE.Quaternion()); }
   tick(now){
+    const dt = Math.min(50, now - (this.lastNow || now)); this.lastNow = now;
+    if(this.spin && dt > 0){
+      const s = this.spin;
+      this.turn(this.freeDelta(s.vx*dt, s.vy*dt));
+      const f = Math.exp(-dt/250); s.vx *= f; s.vy *= f;
+      if(Math.hypot(s.vx, s.vy) < 0.03){ this.spin = null; this.magnet(); }
+    }
     if(this.anim){
       const t = Math.min(1, (now - this.anim.t0)/this.anim.dur);
       const e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
@@ -622,13 +815,22 @@ class Viewer{
       if(t >= 1) this.anim = null;
       this.dirty = true;
     }
-    if(this.dirty){ this.renderer.render(this.scene, this.cam); this.dirty = false; }
+    if(this.dirty){
+      this.vcube.quaternion.copy(this.group.quaternion);
+      this.renderer.render(this.scene, this.cam);
+      this.dirty = false;
+    }
   }
 }
 
 /* ---------- UI ---------- */
 const $ = id => document.getElementById(id);
 const viewers = { A: new Viewer($("viewA")), B: new Viewer($("viewB")) };
+viewers.A.peer = viewers.B; viewers.B.peer = viewers.A;
+$("btnLink").addEventListener("click", () => {
+  linkOn = !linkOn;
+  $("btnLink").setAttribute("aria-pressed", linkOn);
+});
 ["A","B"].forEach(k => {
   viewers[k].onPick = key => {
     // Solo se edita la figura activa; tocar otra vista (o una confirmada) no cambia de modo
@@ -863,7 +1065,7 @@ function compare(){
 $("btnAlign").addEventListener("click", () => {
   if(!alignRot) return;
   const qA = viewers.A.anim ? viewers.A.anim.q1 : viewers.A.group.quaternion;
-  viewers.B.animateTo(qA.clone().multiply(rotQuat(alignRot)));
+  viewers.B.animateTo(qA.clone().multiply(rotQuat(alignRot)), true);
 });
 
 // Bucle de render
