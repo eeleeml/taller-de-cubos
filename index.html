@@ -64,7 +64,8 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 
 /* Editor */
 .editor{padding:16px;display:flex;flex-direction:column;gap:16px}
-.editor h2{margin:0;font-size:1.1rem;font-stretch:85%;font-weight:750}
+.side{display:flex;flex-direction:column;gap:18px}
+.side h2{margin:0;font-size:1.1rem;font-stretch:85%;font-weight:750}
 .seg{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden}
 .seg button{border:0;background:transparent;padding:9px 6px;cursor:pointer;font-weight:650}
 .seg button + button{border-left:1.5px solid var(--ink)}
@@ -115,7 +116,7 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .stage{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:640px){.stage{grid-template-columns:1fr}}
 .viewer{display:flex;flex-direction:column;overflow:hidden;cursor:default}
-.viewer.active{border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
+.viewer.selected{border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
 .vhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 14px 0}
 .vhead h3{margin:0;font-size:1.25rem;font-stretch:80%;font-weight:800}
 .vhead .count{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -125,8 +126,6 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .canvas:active{cursor:grabbing}
 .canvas canvas{display:block;width:100%;height:100%}
 .canvas .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:24px;pointer-events:none;font-size:.92rem}
-.vtools{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
-.vtools .btn{padding:6px 9px;font-size:.84rem}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
 
 .verdict{grid-column:1/-1;padding:18px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;border-width:2px}
@@ -147,6 +146,15 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .btn[aria-pressed="true"]:hover{background:var(--ink);opacity:.9}
 .stagebar{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
 .stagebar .hint{flex:1 1 260px}
+.seg.one{grid-template-columns:1fr}
+.stage.single{grid-template-columns:1fr}
+.stage.single .canvas{aspect-ratio:16/10}
+.controls{padding:16px;display:flex;flex-direction:column;gap:12px}
+.controls .hint{margin:0}
+.rotgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;align-items:center}
+.rotgrid .ax{font-weight:650;font-size:.88rem;padding-right:4px;white-space:nowrap}
+.ctlrow,.pair{display:flex;flex-wrap:wrap;gap:6px}
+.pair{padding-top:12px;border-top:1.5px solid var(--line)}
 .angle{position:absolute;top:10px;left:12px;padding:3px 8px;border-radius:4px;background:var(--panel);border:1.5px solid currentColor;font-weight:700;font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none}
 .editbody{display:flex;flex-direction:column;gap:16px}
 .locked{margin:0;padding:12px;border:1.5px dashed var(--line);border-radius:5px;background:var(--cell);font-size:.9rem;color:var(--muted)}
@@ -162,17 +170,18 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
   </header>
 
   <div class="app">
+    <div class="side">
     <!-- EDITOR -->
     <section class="panel editor" aria-label="Editor de figuras">
       <div>
         <h2 style="margin-bottom:8px" id="editTitle">Estás editando</h2>
-        <div class="seg" role="group" aria-label="Figura que editas">
+        <div class="seg" id="editSeg" role="group" aria-label="Figura que editas">
           <button id="tabA" aria-pressed="true">Modelo (A)</button>
           <button id="tabB" aria-pressed="false">Opción (B)</button>
         </div>
       </div>
 
-      <p class="locked" id="editLocked" hidden>Las figuras están confirmadas: puedes girarlas y tocarlas sin cambiar nada. Para modificar una, pulsa Modelo (A) u Opción (B) aquí arriba, o Editar en su vista.</p>
+      <p class="locked" id="editLocked" hidden></p>
 
       <div class="editbody" id="editBody">
       <div class="dims">
@@ -207,11 +216,32 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 
     </section>
 
-    <!-- STAGE -->
-    <section class="stage" aria-label="Vista 3D">
-      <div class="stagebar">
+    <!-- CONTROLES DE GIRO (comunes; actúan sobre la vista seleccionada) -->
+    <section class="panel controls" aria-label="Controles de giro">
+      <h2>Girar <span id="selName">el modelo</span></h2>
+      <div class="seg" id="selSeg" role="group" aria-label="Vista que giran los controles">
+        <button id="selA" aria-pressed="true">Modelo (A)</button>
+        <button id="selB" aria-pressed="false">Opción (B)</button>
+      </div>
+      <div class="rotgrid" id="rotgrid"></div>
+      <div class="ctlrow">
+        <button class="btn" id="btnSnap" title="Ajusta a la posición alineada más cercana (doble clic en la vista)">Enderezar</button>
+        <button class="btn" id="btnReset" title="Vuelve a la vista inicial y quita el zoom (tecla Inicio)">Restablecer</button>
+        <button class="btn" id="btnRings" aria-pressed="true" title="Muestra u oculta los aros: arrastra un aro para girar solo sobre su eje">Aros</button>
+      </div>
+      <div class="pair" id="pairTools">
         <button class="btn" id="btnLink" aria-pressed="false" title="Al girar una vista, la otra hace el mismo giro">Girar A y B juntas</button>
-        <p class="hint">Arrastra para girar · rueda o pellizco para acercar · doble clic para enderezar · toca el cubo de la esquina para ver desde un lado</p>
+        <button class="btn" id="btnResetBoth" title="Pone las dos vistas en la posición inicial, para que empiecen igual">Restablecer ambas</button>
+      </div>
+      <p class="hint">Arrastra para girar · rueda o pellizco para acercar · doble clic para enderezar · flechas del teclado para girar 90° · toca el cubo de la esquina para ver desde un lado.</p>
+    </section>
+    </div>
+
+    <!-- STAGE -->
+    <section class="stage" id="stage" aria-label="Vista 3D">
+      <div class="stagebar">
+        <button class="btn" id="btnCompare" aria-pressed="false" title="Añade una segunda figura para comprobar si es el modelo girado">Comparar con otra figura</button>
+        <p class="hint" id="compareHint">Empieza construyendo el modelo. Cuando quieras comprobar una opción, activa la comparación.</p>
       </div>
       <article class="panel viewer active" id="cardA">
         <div class="vhead">
@@ -220,7 +250,6 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
           <button class="edit" data-edit="A">Editando</button>
         </div>
         <div class="canvas" id="viewA"><div class="empty" id="emptyA">Marca cubos en la cuadrícula para construir el modelo.</div></div>
-        <div class="vtools" data-v="A"></div>
       </article>
 
       <article class="panel viewer" id="cardB">
@@ -230,7 +259,6 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
           <button class="edit" data-edit="B">Editar</button>
         </div>
         <div class="canvas" id="viewB"><div class="empty" id="emptyB">Construye aquí la opción que quieres comprobar.</div></div>
-        <div class="vtools" data-v="B"></div>
       </article>
 
       <div class="panel verdict neutral" id="verdict" role="status" aria-live="polite">
@@ -244,11 +272,11 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
     <h2>Cómo usarlo para un ejercicio</h2>
     <ol>
       <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
-      <li>Pasa a B y construye la opción que quieres comprobar. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
+      <li>Para comprobar una opción, pulsa Comparar con otra figura y constrúyela en B. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
       <li>Cuando termines una figura, pulsa Confirmar figura. Así la vista 3D la muestra entera y puedes girarla sin que vuelva al modo de edición. Para cambiarla otra vez, pulsa Editar.</li>
-      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): si sueltas cerca de un giro de 90°, se ajusta solo. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Con los botones (o las flechas del teclado) giras 90° de golpe, y Enderezar la devuelve a una posición alineada. El botón Aros los muestra u oculta.</li>
+      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): si sueltas cerca de un giro de 90°, se ajusta solo. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Los controles del panel lateral (giros de 90° en cada sentido, Enderezar, Restablecer y Aros) actúan sobre la vista seleccionada, la que tiene el borde amarillo: tocar una vista la selecciona. Las flechas del teclado también giran 90° la vista seleccionada.</li>
       <li>El cubo de la esquina gira con la figura. Toca una de sus caras (Frente, Arriba, Derecha…) para ver la figura justo desde ese lado, o una arista o esquina para verla en diagonal. Con la rueda del ratón o pellizcando la acercas, y con doble clic la enderezas.</li>
-      <li>Activa Girar A y B juntas para que al girar una vista la otra haga exactamente el mismo giro. Pon antes las dos en la misma postura con Orientar B como A y explóralas a la vez.</li>
+      <li>Activa Girar A y B juntas para que al girar una vista la otra haga exactamente el mismo giro. Pon antes las dos en la misma postura con Restablecer ambas (o con Orientar B como A) y explóralas a la vez.</li>
       <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
     </ol>
   </section>
@@ -273,10 +301,13 @@ function defaults(){
 let figs = defaults();
 let active = "A";
 let layer = 0;
+let comparing = false;   // hay segunda figura (B) para comparar
+let sel = "A";         // vista sobre la que actúan los controles de giro
+let savedLink = false;
 
 function save(){
   try{
-    localStorage.setItem(STORE, JSON.stringify({A:encode(figs.A), B:encode(figs.B), active}));
+    localStorage.setItem(STORE, JSON.stringify({A:encode(figs.A), B:encode(figs.B), active, compare:comparing, sel, link:linkOn}));
   }catch(e){}
 }
 function restore(){
@@ -288,6 +319,10 @@ function restore(){
     if(a) figs.A = a;
     if(b) figs.B = b;
     if(d.active === "A" || d.active === "B" || d.active === null) active = d.active;
+    // Quien ya usaba la página con una figura B tiene la comparación activada
+    comparing = typeof d.compare === "boolean" ? d.compare : !!(b && b.c.size);
+    if(d.sel === "A" || d.sel === "B") sel = d.sel;
+    savedLink = d.link === true;
   }catch(e){}
 }
 
@@ -661,13 +696,25 @@ class Viewer{
     for(const q of SNAP_QUATS){ const d = Math.abs(cur.dot(q)); if(d > bd){ bd = d; best = q; } }
     return {q:best, angle:2*Math.acos(Math.min(1, bd))};
   }
-  snap(){ this.animateTo(this.nearestAligned().q); }
+  // Enderezar e imán actúan en cada vista por separado: con las vistas enlazadas,
+  // cada una va a SU posición recta más cercana (un mismo giro no las dejaría rectas a las dos)
+  snap(){
+    this.animateTo(this.nearestAligned().q, true);
+    if(linkOn && this.peer) this.peer.animateTo(this.peer.nearestAligned().q, true);
+  }
   // Imán: si al soltar queda cerca de una posición recta, se coloca en ella
   magnet(){
-    const n = this.nearestAligned();
-    if(n.angle > 1e-3 && n.angle < 20*DEG) this.animateTo(n.q);
+    for(const v of (linkOn && this.peer) ? [this, this.peer] : [this]){
+      const n = v.nearestAligned();
+      if(n.angle > 1e-3 && n.angle < 20*DEG) v.animateTo(n.q, true);
+    }
   }
-  reset(){ this.animateTo(new THREE.Quaternion()); this.setZoom(1); }
+  // Restablecer es absoluto: con las vistas enlazadas vuelven las dos a la posición inicial
+  reset(){
+    for(const v of (linkOn && this.peer) ? [this, this.peer] : [this]){
+      v.animateTo(new THREE.Quaternion(), true); v.setZoom(1);
+    }
+  }
 
   bindDrag(){
     const el = this.el;
@@ -687,6 +734,7 @@ class Viewer{
         endGesture();
         return;
       }
+      if(this.onSelect) this.onSelect();
       if(pointers.size > 2 || pinch) return;
       this.spin = null;
       if(linkOn && this.peer) this.peer.spin = null;
@@ -775,17 +823,21 @@ class Viewer{
   bindKeys(){
     const el = this.el;
     el.tabIndex = 0;
-    el.addEventListener("keydown", e => {
-      const keys = {
-        ArrowLeft: () => this.rotate("y", -1), ArrowRight: () => this.rotate("y", 1),
-        ArrowUp: () => this.rotate("x", -1), ArrowDown: () => this.rotate("x", 1),
-        "+": () => this.setZoom(this.zoom*1.2), "=": () => this.setZoom(this.zoom*1.2),
-        "-": () => this.setZoom(this.zoom/1.2), Home: () => this.reset()
-      };
-      const f = keys[e.key];
-      if(!f || e.altKey || e.ctrlKey || e.metaKey) return;
-      e.preventDefault(); f();
-    });
+    el.addEventListener("focus", () => { if(this.onSelect) this.onSelect(); });
+    el.addEventListener("keydown", e => this.handleKey(e));
+  }
+  // Devuelve true si la tecla era de giro o zoom (también la usa el atajo global de la página)
+  handleKey(e){
+    const keys = {
+      ArrowLeft: () => this.rotate("y", -1), ArrowRight: () => this.rotate("y", 1),
+      ArrowUp: () => this.rotate("x", -1), ArrowDown: () => this.rotate("x", 1),
+      "+": () => this.setZoom(this.zoom*1.2), "=": () => this.setZoom(this.zoom*1.2),
+      "-": () => this.setZoom(this.zoom/1.2), Home: () => this.reset()
+    };
+    const f = keys[e.key];
+    if(!f || e.altKey || e.ctrlKey || e.metaKey) return false;
+    e.preventDefault(); f();
+    return true;
   }
   pick(e){
     if(!this.onPick) return;
@@ -826,10 +878,93 @@ class Viewer{
 /* ---------- UI ---------- */
 const $ = id => document.getElementById(id);
 const viewers = { A: new Viewer($("viewA")), B: new Viewer($("viewB")) };
-viewers.A.peer = viewers.B; viewers.B.peer = viewers.A;
+["A","B"].forEach(k => { viewers[k].onSelect = () => select(k); });
+
+/* Modo una figura / comparar */
+function setCompare(on){
+  comparing = on;
+  // Sin segunda figura no hay enlace entre vistas
+  viewers.A.peer = on ? viewers.B : null;
+  viewers.B.peer = on ? viewers.A : null;
+  if(!on){
+    if(active === "B") active = "A";
+    sel = "A";
+  }
+  $("btnCompare").setAttribute("aria-pressed", on);
+  $("compareHint").textContent = on
+    ? "Construye en B la opción que dudas. El veredicto de abajo te dice si es el modelo girado."
+    : "Empieza construyendo el modelo. Cuando quieras comprobar una opción, activa la comparación.";
+  $("stage").classList.toggle("single", !on);
+  $("cardB").hidden = !on;
+  $("verdict").hidden = !on;
+  $("tabB").hidden = !on;
+  $("editSeg").classList.toggle("one", !on);
+  $("selSeg").hidden = !on;
+  $("pairTools").hidden = !on;
+  $("btnCopy").hidden = !on;
+  $("btnSwap").hidden = !on;
+  renderEditor();
+  renderControls();
+  // Las vistas cambian de tamaño al pasar de una a dos columnas
+  requestAnimationFrame(() => { viewers.A.resize(); viewers.B.resize(); });
+  save();
+}
+$("btnCompare").addEventListener("click", () => setCompare(!comparing));
+
+/* Controles de giro comunes */
+function select(k){
+  if(!comparing) k = "A";
+  if(sel === k) return;
+  sel = k;
+  renderControls();
+  save();
+}
+function renderControls(){
+  $("selName").textContent = !comparing ? "el modelo" : sel === "A" ? "el modelo (A)" : "la opción (B)";
+  $("selA").setAttribute("aria-pressed", sel === "A");
+  $("selB").setAttribute("aria-pressed", sel === "B");
+  $("cardA").classList.toggle("selected", comparing && sel === "A");
+  $("cardB").classList.toggle("selected", comparing && sel === "B");
+  $("btnRings").setAttribute("aria-pressed", viewers[sel].ringsOn);
+  $("btnLink").setAttribute("aria-pressed", linkOn);
+}
+$("selA").addEventListener("click", () => select("A"));
+$("selB").addEventListener("click", () => select("B"));
+
+const rg = $("rotgrid");
+for(const [ax, col, name] of [["x","#D9534F","Eje X"],["y","#2E9E5B","Eje Y"],["z","#3B6FD8","Eje Z"]]){
+  const lab = document.createElement("span");
+  lab.className = "ax"; lab.innerHTML = '<span class="dot" style="background:'+col+'"></span>'+name;
+  rg.appendChild(lab);
+  for(const [sign, txt] of [[-1,"↶ −90°"],[1,"+90° ↷"]]){
+    const b = document.createElement("button");
+    b.className = "btn"; b.textContent = txt;
+    b.title = "Gira " + (sign > 0 ? "+" : "−") + "90° sobre el " + name.toLowerCase();
+    b.addEventListener("click", () => viewers[sel].rotate(ax, sign));
+    rg.appendChild(b);
+  }
+}
+$("btnSnap").addEventListener("click", () => viewers[sel].snap());
+$("btnReset").addEventListener("click", () => viewers[sel].reset());
+$("btnRings").addEventListener("click", () => {
+  viewers[sel].setRings(!viewers[sel].ringsOn);
+  renderControls();
+});
 $("btnLink").addEventListener("click", () => {
   linkOn = !linkOn;
-  $("btnLink").setAttribute("aria-pressed", linkOn);
+  renderControls();
+  save();
+});
+$("btnResetBoth").addEventListener("click", () => {
+  for(const v of [viewers.A, viewers.B]){ v.animateTo(new THREE.Quaternion(), true); v.setZoom(1); }
+});
+
+// Flechas y zoom desde cualquier parte de la página: actúan sobre la vista seleccionada
+document.addEventListener("keydown", e => {
+  if(e.defaultPrevented) return;
+  const t = e.target;
+  if(t && (t.closest("select, input, textarea, .grid, .canvas") )) return;
+  viewers[sel].handleKey(e);
 });
 ["A","B"].forEach(k => {
   viewers[k].onPick = key => {
@@ -844,38 +979,6 @@ function refreshViews(){
   viewers.A.setFigure(figs.A, active === "A" ? layer : null);
   viewers.B.setFigure(figs.B, active === "B" ? layer : null);
 }
-
-// Barras de herramientas de cada visor
-document.querySelectorAll(".vtools").forEach(bar => {
-  const k = bar.dataset.v;
-  const items = [
-    ["Girar X","x","#D9534F","Gira 90° sobre el eje rojo"],
-    ["Girar Y","y","#2E9E5B","Gira 90° sobre el eje verde (vertical)"],
-    ["Girar Z","z","#3B6FD8","Gira 90° sobre el eje azul"]
-  ];
-  for(const [label, ax, col, title] of items){
-    const b = document.createElement("button");
-    b.className = "btn"; b.title = title;
-    b.innerHTML = '<span class="dot" style="background:'+col+'"></span>'+label;
-    b.addEventListener("click", () => viewers[k].rotate(ax));
-    bar.appendChild(b);
-  }
-  const s = document.createElement("button");
-  s.className = "btn"; s.textContent = "Enderezar"; s.title = "Ajusta a la posición alineada más cercana";
-  s.addEventListener("click", () => viewers[k].snap());
-  const r = document.createElement("button");
-  r.className = "btn"; r.textContent = "Restablecer"; r.title = "Vuelve a la vista inicial";
-  r.addEventListener("click", () => viewers[k].reset());
-  const t = document.createElement("button");
-  t.className = "btn"; t.textContent = "Aros"; t.title = "Muestra u oculta los aros: arrastra un aro para girar solo sobre su eje";
-  t.setAttribute("aria-pressed", "true");
-  t.addEventListener("click", () => {
-    const on = t.getAttribute("aria-pressed") !== "true";
-    t.setAttribute("aria-pressed", on);
-    viewers[k].setRings(on);
-  });
-  bar.append(s, r, t);
-});
 
 // Selectores de tamaño
 ["dimX","dimY","dimZ"].forEach((id, i) => {
@@ -892,7 +995,7 @@ document.querySelectorAll(".vtools").forEach(bar => {
 
 function setActive(k){
   active = k;
-  if(k) layer = Math.min(layer, figs[k].n[1]-1);
+  if(k){ layer = Math.min(layer, figs[k].n[1]-1); select(k); }
   renderEditor();
   save();
 }
@@ -908,7 +1011,10 @@ function renderEditor(){
   $("cardB").classList.toggle("active", active==="B");
   document.querySelector('[data-edit="A"]').textContent = active==="A" ? "Editando" : "Editar";
   document.querySelector('[data-edit="B"]').textContent = active==="B" ? "Editando" : "Editar";
-  $("editTitle").textContent = active ? "Estás editando" : "Ninguna figura en edición";
+  $("editTitle").textContent = active ? "Estás editando" : comparing ? "Ninguna figura en edición" : "Modelo confirmado";
+  $("editLocked").textContent = comparing
+    ? "Las figuras están confirmadas: puedes girarlas y tocarlas sin cambiar nada. Para modificar una, pulsa Modelo (A) u Opción (B) aquí arriba, o Editar en su vista."
+    : "El modelo está confirmado: puedes girarlo y tocarlo sin cambiar nada. Para modificarlo, pulsa Modelo (A) aquí arriba o Editar en su vista.";
   $("editLocked").hidden = !!active;
   $("editBody").hidden = !active;
   if(!active){ refreshViews(); return; }
@@ -1072,8 +1178,11 @@ $("btnAlign").addEventListener("click", () => {
 function loop(now){ viewers.A.tick(now); viewers.B.tick(now); requestAnimationFrame(loop); }
 
 restore();
+linkOn = savedLink;
 changed("A"); changed("B");
+if(!comparing && active === "B") active = "A";
 setActive(active);
+setCompare(comparing);
 requestAnimationFrame(loop);
 })();
 </script>
