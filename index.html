@@ -274,7 +274,7 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
       <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
       <li>Para comprobar una opción, pulsa Comparar con otra figura y constrúyela en B. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
       <li>Cuando termines una figura, pulsa Confirmar figura. Así la vista 3D la muestra entera y puedes girarla sin que vuelva al modo de edición. Para cambiarla otra vez, pulsa Editar.</li>
-      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): si sueltas cerca de un giro de 90°, se ajusta solo. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Los controles del panel lateral (giros de 90° en cada sentido, Enderezar, Restablecer y Aros) actúan sobre la vista seleccionada, la que tiene el borde amarillo: tocar una vista la selecciona. Las flechas del teclado también giran 90° la vista seleccionada.</li>
+      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): la figura se queda justo donde la sueltas, y arriba ves cuántos grados has girado. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Los controles del panel lateral (giros de 90° en cada sentido, Enderezar, Restablecer y Aros) actúan sobre la vista seleccionada, la que tiene el borde amarillo: tocar una vista la selecciona. Las flechas del teclado también giran 90° la vista seleccionada.</li>
       <li>El cubo de la esquina gira con la figura. Toca una de sus caras (Frente, Arriba, Derecha…) para ver la figura justo desde ese lado, o una arista o esquina para verla en diagonal. Con la rueda del ratón o pellizcando la acercas, y con doble clic la enderezas.</li>
       <li>Activa Girar A y B juntas para que al girar una vista la otra haga exactamente el mismo giro. Pon antes las dos en la misma postura con Restablecer ambas (o con Orientar B como A) y explóralas a la vez.</li>
       <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
@@ -569,13 +569,7 @@ class Viewer{
     clearTimeout(this.angleTimer);
   }
   endRingDrag(){
-    // Si se suelta cerca de un múltiplo de 90°, se ajusta a él
-    const d = this.drag, q90 = Math.PI/2;
-    const k = Math.round(d.total/q90)*q90;
-    if(Math.abs(d.total - k) < 12*DEG){
-      this.animateTo(new THREE.Quaternion().setFromAxisAngle(d.ring.axis, k).multiply(d.q0));
-      this.showAngle(d.ring, k);
-    }
+    // La figura se queda exactamente donde se suelta (sin ajustar a 90°)
     this.angleTimer = setTimeout(() => { this.angleLabel.hidden = true; }, 1200);
   }
 
