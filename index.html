@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Taller de cubos: rotación de figuras</title>
+<title>Taller de cubos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -154,20 +154,58 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
 .rotgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;align-items:center}
 .rotgrid .ax{font-weight:650;font-size:.88rem;padding-right:4px;white-space:nowrap}
 .ctlrow,.pair{display:flex;flex-wrap:wrap;gap:6px}
+#btnRings{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px}
+#btnRings .ico{width:22px;height:22px;fill:none;stroke-width:1.8}
+#btnRings[aria-pressed="false"] .ico{opacity:.35}
 .pair{padding-top:12px;border-top:1.5px solid var(--line)}
 .angle{position:absolute;top:10px;left:12px;padding:3px 8px;border-radius:4px;background:var(--panel);border:1.5px solid currentColor;font-weight:700;font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none}
 .editbody{display:flex;flex-direction:column;gap:16px}
 .locked{margin:0;padding:12px;border:1.5px dashed var(--line);border-radius:5px;background:var(--cell);font-size:.9rem;color:var(--muted)}
 .btn.wide{width:100%;padding:10px 12px;font-size:.95rem}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* Pestañas de ejercicio */
+.modes{display:flex;gap:6px;margin:0 0 18px;border-bottom:2px solid var(--ink)}
+.modes button{
+  border:1.5px solid var(--ink);border-bottom:0;border-radius:6px 6px 0 0;background:var(--panel);
+  padding:9px 20px;cursor:pointer;font-weight:750;font-stretch:85%;font-size:1.05rem
+}
+.modes button[aria-selected="true"]{background:var(--ink);color:var(--panel)}
+
+/* Construcción */
+.cstage{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.cstage .big{grid-column:1/-1}
+.cstage .big .canvas{aspect-ratio:16/9}
+.pc .vhead{flex-wrap:wrap;gap:2px 8px;padding:10px 10px 0}
+.pc .vhead h3{font-size:1.05rem}
+.pc .canvas{min-height:170px}
+.pfoot{display:flex;align-items:center;gap:6px;padding:0 10px 10px;min-height:42px}
+.btn.sm{padding:5px 9px;font-size:.82rem}
+.tag{font-size:.78rem;font-weight:750;padding:3px 7px;border-radius:4px}
+.tag.used{background:var(--ok-bg);color:var(--ok)}
+.tag.odd{background:var(--bad-bg);color:var(--bad)}
+.viewer.odd .canvas{opacity:.55}
+.cbtns{display:flex;flex-wrap:wrap;gap:6px}
+.steps{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.steps span{font-size:.85rem;font-weight:650;margin-right:2px}
+.verdict .steps .btn[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.lvl{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
+.lvl select{padding:6px 8px;border:1.5px solid var(--line);border-radius:5px;background:var(--cell);color:var(--ink)}
+.custom{display:flex;flex-wrap:wrap;gap:6px 12px}
+@media (max-width:760px){.cstage{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <h1>Taller de cubos</h1>
-    <p>Construye la figura modelo y la opción que dudas, nivel a nivel. Gíralas en 3D y comprueba al instante si la opción es la misma figura girada o su imagen en espejo.</p>
+    <p id="intro">Construye la figura modelo y la opción que dudas, nivel a nivel. Gíralas en 3D y comprueba al instante si la opción es la misma figura girada o su imagen en espejo.</p>
   </header>
+
+  <nav class="modes" role="tablist" aria-label="Tipo de ejercicio">
+    <button id="modeRot" role="tab" aria-selected="true">Rotación</button>
+    <button id="modeCons" role="tab" aria-selected="false">Construcción</button>
+  </nav>
 
   <div class="app">
     <div class="side">
@@ -175,10 +213,7 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
     <section class="panel editor" aria-label="Editor de figuras">
       <div>
         <h2 style="margin-bottom:8px" id="editTitle">Estás editando</h2>
-        <div class="seg" id="editSeg" role="group" aria-label="Figura que editas">
-          <button id="tabA" aria-pressed="true">Modelo (A)</button>
-          <button id="tabB" aria-pressed="false">Opción (B)</button>
-        </div>
+        <div class="seg" id="editSeg" role="group" aria-label="Figura que editas"></div>
       </div>
 
       <p class="locked" id="editLocked" hidden></p>
@@ -219,15 +254,12 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
     <!-- CONTROLES DE GIRO (comunes; actúan sobre la vista seleccionada) -->
     <section class="panel controls" aria-label="Controles de giro">
       <h2>Girar <span id="selName">el modelo</span></h2>
-      <div class="seg" id="selSeg" role="group" aria-label="Vista que giran los controles">
-        <button id="selA" aria-pressed="true">Modelo (A)</button>
-        <button id="selB" aria-pressed="false">Opción (B)</button>
-      </div>
+      <div class="seg" id="selSeg" role="group" aria-label="Vista que giran los controles"></div>
       <div class="rotgrid" id="rotgrid"></div>
       <div class="ctlrow">
         <button class="btn" id="btnSnap" title="Ajusta a la posición alineada más cercana (doble clic en la vista)">Enderezar</button>
         <button class="btn" id="btnReset" title="Vuelve a la vista inicial y quita el zoom (tecla Inicio)">Restablecer</button>
-        <button class="btn" id="btnRings" aria-pressed="true" title="Muestra u oculta los aros: arrastra un aro para girar solo sobre su eje">Aros</button>
+        <button class="btn" id="btnRings" aria-pressed="true" aria-label="Aros de giro" title="Muestra u oculta los aros: arrastra un aro para girar solo sobre su eje"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="9.5" ry="9.5" stroke="#3B6FD8"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" stroke="#2E9E5B"/><ellipse cx="12" cy="12" rx="3.6" ry="9.5" stroke="#D9534F"/></svg></button>
       </div>
       <div class="pair" id="pairTools">
         <button class="btn" id="btnLink" aria-pressed="false" title="Al girar una vista, la otra hace el mismo giro">Girar A y B juntas</button>
@@ -266,15 +298,86 @@ header.top p{margin:0;max-width:58ch;color:var(--muted)}
         <button class="btn" id="btnAlign" hidden>Orientar B como A</button>
       </div>
     </section>
+
+    <!-- CONSTRUCCIÓN: una figura y cuatro piezas, sobra una -->
+    <section class="cstage" id="cstage" aria-label="Ejercicio de construcción" hidden>
+      <div class="stagebar">
+        <button class="btn primary" id="btnNew">Nuevo ejercicio</button>
+        <label class="lvl">Dificultad
+          <select id="level">
+            <option value="1">Fácil</option>
+            <option value="2" selected>Media</option>
+            <option value="3">Difícil</option>
+            <option value="c">Personalizado</option>
+          </select>
+        </label>
+        <span class="custom" id="custom" hidden>
+          <label class="lvl">Ancho <select id="gX"></select></label>
+          <label class="lvl">Alto <select id="gY"></select></label>
+          <label class="lvl">Fondo <select id="gZ"></select></label>
+          <label class="lvl">Cubos <select id="gN"></select></label>
+        </span>
+        <p class="hint">Copia el enunciado en Figura y en las piezas 1 a 4, o pide un ejercicio nuevo para practicar.</p>
+      </div>
+      <article class="panel viewer big" id="cardT">
+        <div class="vhead">
+          <h3>Figura</h3>
+          <span class="count" id="countT"></span>
+          <button class="edit" data-edit="T">Editar</button>
+        </div>
+        <div class="canvas" id="viewT"><div class="empty" id="emptyT">Construye aquí la figura del enunciado.</div></div>
+      </article>
+      <article class="panel viewer pc" id="card1">
+        <div class="vhead"><h3><span class="dot" style="background:#F08A6C"></span>Pieza 1</h3><span class="count" id="count1"></span><button class="edit" data-edit="1">Editar</button></div>
+        <div class="canvas" id="view1"><div class="empty" id="empty1">Construye la pieza 1.</div></div>
+        <div class="pfoot"><button class="btn sm" data-ans="1">Sobra esta</button><span class="tag" id="tag1" hidden></span></div>
+      </article>
+      <article class="panel viewer pc" id="card2">
+        <div class="vhead"><h3><span class="dot" style="background:#5FBF8A"></span>Pieza 2</h3><span class="count" id="count2"></span><button class="edit" data-edit="2">Editar</button></div>
+        <div class="canvas" id="view2"><div class="empty" id="empty2">Construye la pieza 2.</div></div>
+        <div class="pfoot"><button class="btn sm" data-ans="2">Sobra esta</button><span class="tag" id="tag2" hidden></span></div>
+      </article>
+      <article class="panel viewer pc" id="card3">
+        <div class="vhead"><h3><span class="dot" style="background:#B08AE6"></span>Pieza 3</h3><span class="count" id="count3"></span><button class="edit" data-edit="3">Editar</button></div>
+        <div class="canvas" id="view3"><div class="empty" id="empty3">Construye la pieza 3.</div></div>
+        <div class="pfoot"><button class="btn sm" data-ans="3">Sobra esta</button><span class="tag" id="tag3" hidden></span></div>
+      </article>
+      <article class="panel viewer pc" id="card4">
+        <div class="vhead"><h3><span class="dot" style="background:#EDBB4A"></span>Pieza 4</h3><span class="count" id="count4"></span><button class="edit" data-edit="4">Editar</button></div>
+        <div class="canvas" id="view4"><div class="empty" id="empty4">Construye la pieza 4.</div></div>
+        <div class="pfoot"><button class="btn sm" data-ans="4">Sobra esta</button><span class="tag" id="tag4" hidden></span></div>
+      </article>
+      <div class="panel verdict neutral" id="cverdict" role="status" aria-live="polite">
+        <div class="big"><span id="cTitle"></span><p class="small" id="cText"></p></div>
+        <div class="cbtns">
+          <button class="btn" id="btnHint">Pista</button>
+          <button class="btn" id="btnReveal">Ver solución</button>
+          <button class="btn" id="btnOrient" hidden>Orientar las piezas como en la figura</button>
+        </div>
+        <div class="steps" id="steps" hidden></div>
+      </div>
+    </section>
   </div>
 
-  <section class="panel how">
+  <section class="panel how" id="howCons" hidden>
+    <h2>Cómo usarlo para un ejercicio de construcción</h2>
+    <ol>
+      <li>Copia el enunciado: en Figura construye la figura grande y en las piezas 1 a 4 las cuatro piezas, nivel a nivel, igual que en Rotación. No hace falta que las piezas estén en la misma postura que dentro de la figura.</li>
+      <li>Para practicar sin enunciado, elige la dificultad y pulsa Nuevo ejercicio: la herramienta inventa una figura y cuatro piezas, y solo tres de ellas la forman. Con Personalizado eliges el ancho, el alto y el fondo máximos de la figura (de 2 a 5) y cuántos cubos tiene; en Automático ocupa más o menos la mitad de ese espacio.</li>
+      <li>Gira la figura y las piezas con el panel de giro; tocar una vista la selecciona. Cuando lo tengas claro, pulsa Sobra esta en la pieza que crees que sobra.</li>
+      <li>Truco: cuenta los cubos. Las tres piezas que se usan suman exactamente los cubos de la figura, y eso suele descartar alguna. El botón Pista hace la cuenta por ti.</li>
+      <li>Con la solución, cada pieza aparece coloreada dentro de la figura. En Ver puedes mirar una pieza sola, y Orientar las piezas las gira tal como van colocadas.</li>
+      <li>Las piezas se pueden girar, pero no reflejar: una pieza que solo encaja en espejo cuenta como distinta.</li>
+    </ol>
+  </section>
+
+  <section class="panel how" id="howRot">
     <h2>Cómo usarlo para un ejercicio</h2>
     <ol>
       <li>Elige el tamaño de la cuadrícula y construye la figura modelo en A, empezando por el nivel 1 (el suelo). En la vista 3D, el nivel que editas aparece en amarillo, la línea naranja marca el frente y los niveles de encima se ven transparentes.</li>
       <li>Para comprobar una opción, pulsa Comparar con otra figura y constrúyela en B. No hace falta que esté en la misma posición: la comparación prueba los 24 giros posibles.</li>
       <li>Cuando termines una figura, pulsa Confirmar figura. Así la vista 3D la muestra entera y puedes girarla sin que vuelva al modo de edición. Para cambiarla otra vez, pulsa Editar.</li>
-      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): la figura se queda justo donde la sueltas, y arriba ves cuántos grados has girado. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Los controles del panel lateral (giros de 90° en cada sentido, Enderezar, Restablecer y Aros) actúan sobre la vista seleccionada, la que tiene el borde amarillo: tocar una vista la selecciona. Las flechas del teclado también giran 90° la vista seleccionada.</li>
+      <li>Para girar sobre un solo eje, arrastra uno de los aros de colores que rodean la figura (rojo X, verde Y, azul Z): la figura se queda justo donde la sueltas, y arriba ves cuántos grados has girado. Arrastrando fuera de los aros la giras libremente: si la sueltas con impulso sigue girando un poco, y si al parar queda casi recta, se endereza sola. Los controles del panel lateral (giros de 90° en cada sentido, Enderezar, Restablecer y el botón de los aros, que los muestra u oculta) actúan sobre la vista seleccionada, la que tiene el borde amarillo: tocar una vista la selecciona. Las flechas del teclado también giran 90° la vista seleccionada.</li>
       <li>El cubo de la esquina gira con la figura. Toca una de sus caras (Frente, Arriba, Derecha…) para ver la figura justo desde ese lado, o una arista o esquina para verla en diagonal. Con la rueda del ratón o pellizcando la acercas, y con doble clic la enderezas.</li>
       <li>Activa Girar A y B juntas para que al girar una vista la otra haga exactamente el mismo giro. Pon antes las dos en la misma postura con Restablecer ambas (o con Orientar B como A) y explóralas a la vez.</li>
       <li>Si B es A girada, Orientar B como A la gira hasta que ambas se ven igual. Si es su imagen en espejo, te lo indica, porque eso no se consigue girando.</li>
@@ -292,23 +395,34 @@ const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: r
 
 /* ---------- Estado ---------- */
 function mkFig(n, cells){ return { n: n.slice(), c: new Set(cells) }; }
+// Rotación usa A y B; Construcción usa la figura T y las piezas 1 a 4
+const PKEYS = ["1","2","3","4"];
+const CKEYS = ["T", ...PKEYS];
+const ALL = ["A","B", ...CKEYS];
 function defaults(){
-  return {
+  const f = {
     A: mkFig([3,3,3], ["0,0,0","1,0,0","2,0,0","2,0,1","0,1,0","0,2,0","1,2,0"]),
     B: mkFig([3,3,3], [])
   };
+  for(const k of CKEYS) f[k] = mkFig([3,3,3], []);
+  return f;
 }
 let figs = defaults();
+let mode = "rot";      // "rot" (Rotación) o "cons" (Construcción)
 let active = "A";
 let layer = 0;
 let comparing = false;   // hay segunda figura (B) para comparar
 let sel = "A";         // vista sobre la que actúan los controles de giro
 let savedLink = false;
+// Cada pestaña recuerda qué figura se editaba y cuál estaba seleccionada
+const memo = { rot:{active:"A", sel:"A"}, cons:{active:null, sel:"T"} };
 
 function save(){
-  try{
-    localStorage.setItem(STORE, JSON.stringify({A:encode(figs.A), B:encode(figs.B), active, compare:comparing, sel, link:linkOn}));
-  }catch(e){}
+  memo[mode] = {active, sel};
+  const d = {active:memo.rot.active, sel:memo.rot.sel, cActive:memo.cons.active, cSel:memo.cons.sel,
+             compare:comparing, link:linkOn, mode};
+  for(const k of ALL) d[k] = encode(figs[k]);
+  try{ localStorage.setItem(STORE, JSON.stringify(d)); }catch(e){}
 }
 function restore(){
   try{
@@ -323,7 +437,12 @@ function restore(){
     comparing = typeof d.compare === "boolean" ? d.compare : !!(b && b.c.size);
     if(d.sel === "A" || d.sel === "B") sel = d.sel;
     savedLink = d.link === true;
+    for(const k of CKEYS){ const f = decode(d[k]); if(f) figs[k] = f; }
+    if(CKEYS.includes(d.cActive) || d.cActive === null) memo.cons.active = d.cActive;
+    if(CKEYS.includes(d.cSel)) memo.cons.sel = d.cSel;
+    if(d.mode === "cons") mode = "cons";
   }catch(e){}
+  memo.rot = {active, sel};
 }
 
 /* ---------- Códigos ---------- */
@@ -388,6 +507,11 @@ const ghostEdgeMat = new THREE.LineBasicMaterial({color:EDGE, transparent:true, 
 const layerMat = new THREE.MeshBasicMaterial({color:0xF2C230, transparent:true, opacity:0.3, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2});
 const layerLineMat = new THREE.LineBasicMaterial({color:0xB8860B, transparent:true, opacity:0.85});
 const frontMat = new THREE.MeshBasicMaterial({color:0xE8890C});
+const matCache = new Map();
+function matFor(color){
+  if(!matCache.has(color)) matCache.set(color, new THREE.MeshLambertMaterial({color, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}));
+  return matCache.get(color);
+}
 
 // Girar A y B a la vez (lo cambia el botón de la barra de vistas)
 let linkOn = false;
@@ -494,7 +618,7 @@ class Viewer{
       {name:"Z", axis:new THREE.Vector3(0,0,1), color:0x3B6FD8, css:"#3B6FD8", rot:[0, 0, 0]}
     ];
     for(const r of this.ringList){
-      r.mat = new THREE.MeshBasicMaterial({color:r.color, transparent:true, opacity:0.75, depthTest:false, depthWrite:false});
+      r.mat = new THREE.MeshBasicMaterial({color:r.color, transparent:true, opacity:0.4, depthTest:false, depthWrite:false});
       r.mesh = new THREE.Mesh(undefined, r.mat); r.mesh.renderOrder = 10;
       r.hit = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial({visible:false}));
       r.hit.userData.ring = r;
@@ -519,7 +643,8 @@ class Viewer{
     for(const r of this.ringList){
       const hot = act ? r === act : r === this.hoverRing;
       r.mesh.geometry = hot ? r.thick : r.thin;
-      r.mat.opacity = act ? (hot ? 1 : 0.18) : (hot ? 1 : 0.75);
+      // Suaves en reposo para no tapar la figura; el aro que se toca o arrastra se ve entero
+      r.mat.opacity = act ? (hot ? 0.9 : 0.1) : (hot ? 0.85 : 0.4);
     }
     this.dirty = true;
   }
@@ -573,7 +698,10 @@ class Viewer{
     this.angleTimer = setTimeout(() => { this.angleLabel.hidden = true; }, 1200);
   }
 
-  setFigure(f, editLayer){
+  // opts.color: un color para toda la figura; opts.colors: color por cubo ("x,y,z" → color);
+  // opts.focus: cubos que se ven sólidos (el resto, transparentes)
+  setFigure(f, editLayer, opts){
+    opts = opts || {};
     while(this.group.children.length){
       const c = this.group.children[0];
       this.group.remove(c);
@@ -584,8 +712,10 @@ class Viewer{
     this.pickables = [];
     const ctr = f.n.map(n => (n-1)/2);
     for(const v of pts(f)){
-      const above = this.editLayer !== null && v[1] > this.editLayer;
-      const m = new THREE.Mesh(boxGeo, above ? ghostMat : cubeMat);
+      const key = v.join(",");
+      const above = (this.editLayer !== null && v[1] > this.editLayer) || (opts.focus && !opts.focus.has(key));
+      const col = (opts.colors && opts.colors.get(key)) || opts.color;
+      const m = new THREE.Mesh(boxGeo, above ? ghostMat : col ? matFor(col) : cubeMat);
       m.position.set(v[0]-ctr[0], v[1]-ctr[1], v[2]-ctr[2]);
       m.add(new THREE.LineSegments(edgeGeo, above ? ghostEdgeMat : edgeMat));
       if(above) m.renderOrder = 2; else m.castShadow = true;
@@ -871,8 +1001,61 @@ class Viewer{
 
 /* ---------- UI ---------- */
 const $ = id => document.getElementById(id);
-const viewers = { A: new Viewer($("viewA")), B: new Viewer($("viewB")) };
-["A","B"].forEach(k => { viewers[k].onSelect = () => select(k); });
+const viewers = {};
+for(const k of ALL){ viewers[k] = new Viewer($("view"+k)); viewers[k].onSelect = () => select(k); }
+// En las piezas, que son vistas pequeñas, los aros empiezan ocultos (el botón de los aros los muestra)
+for(const k of ["1","2","3","4"]) viewers[k].setRings(false);
+
+const PCOL = {"1":0xF08A6C, "2":0x5FBF8A, "3":0xB08AE6, "4":0xEDBB4A};
+const PCSS = {"1":"#F08A6C", "2":"#5FBF8A", "3":"#B08AE6", "4":"#EDBB4A"};
+const GREY = 0xAEB6C4;
+const dotHTML = k => '<span class="dot" style="background:'+PCSS[k]+'"></span>';
+// Etiquetas de los botones de pestaña (el editor y el panel de giro)
+function tabLabel(k){
+  if(k === "A") return "Modelo (A)";
+  if(k === "B") return "Opción (B)";
+  if(k === "T") return "Figura";
+  return dotHTML(k) + k;
+}
+const INTRO = {
+  rot: "Construye la figura modelo y la opción que dudas, nivel a nivel. Gíralas en 3D y comprueba al instante si la opción es la misma figura girada o su imagen en espejo.",
+  cons: "Una figura y cuatro piezas: tres la forman y una sobra. Copia el enunciado o pide un ejercicio nuevo, gira las piezas y encuentra la que sobra; después verás dónde va cada una."
+};
+// Figuras visibles y editables en la pestaña actual
+function keysFor(){ return mode === "cons" ? CKEYS : comparing ? ["A","B"] : ["A"]; }
+function modeKeys(){ return mode === "cons" ? CKEYS : ["A","B"]; }
+
+/* Pestañas Rotación / Construcción */
+function applyLayout(){
+  const rot = mode === "rot";
+  $("modeRot").setAttribute("aria-selected", rot);
+  $("modeCons").setAttribute("aria-selected", !rot);
+  $("stage").hidden = !rot;
+  $("cstage").hidden = rot;
+  $("howRot").hidden = !rot;
+  $("howCons").hidden = rot;
+  $("intro").textContent = INTRO[mode];
+  $("pairTools").hidden = !(rot && comparing);
+  $("btnCopy").hidden = !(rot && comparing);
+  $("btnSwap").hidden = !(rot && comparing);
+  renderEditor();
+  renderControls();
+  if(!rot) renderCons();
+  // Las vistas que estaban ocultas no tenían tamaño
+  requestAnimationFrame(() => { for(const k of ALL) viewers[k].resize(); });
+}
+function setMode(m){
+  if(m === mode) return;
+  memo[mode] = {active, sel};
+  mode = m;
+  active = memo[m].active; sel = memo[m].sel;
+  if(active) layer = Math.min(layer, figs[active].n[1]-1);
+  if(m === "cons" && CKEYS.every(k => !figs[k].c.size)) generate($("level").value);
+  applyLayout();
+  save();
+}
+$("modeRot").addEventListener("click", () => setMode("rot"));
+$("modeCons").addEventListener("click", () => setMode("cons"));
 
 /* Modo una figura / comparar */
 function setCompare(on){
@@ -881,8 +1064,8 @@ function setCompare(on){
   viewers.A.peer = on ? viewers.B : null;
   viewers.B.peer = on ? viewers.A : null;
   if(!on){
-    if(active === "B") active = "A";
-    sel = "A";
+    if(mode === "rot"){ if(active === "B") active = "A"; sel = "A"; }
+    else { if(memo.rot.active === "B") memo.rot.active = "A"; memo.rot.sel = "A"; }
   }
   $("btnCompare").setAttribute("aria-pressed", on);
   $("compareHint").textContent = on
@@ -891,39 +1074,46 @@ function setCompare(on){
   $("stage").classList.toggle("single", !on);
   $("cardB").hidden = !on;
   $("verdict").hidden = !on;
-  $("tabB").hidden = !on;
-  $("editSeg").classList.toggle("one", !on);
-  $("selSeg").hidden = !on;
-  $("pairTools").hidden = !on;
-  $("btnCopy").hidden = !on;
-  $("btnSwap").hidden = !on;
-  renderEditor();
-  renderControls();
-  // Las vistas cambian de tamaño al pasar de una a dos columnas
-  requestAnimationFrame(() => { viewers.A.resize(); viewers.B.resize(); });
+  applyLayout();
   save();
 }
 $("btnCompare").addEventListener("click", () => setCompare(!comparing));
 
 /* Controles de giro comunes */
 function select(k){
-  if(!comparing) k = "A";
-  if(sel === k) return;
+  if(mode === "rot" && !comparing) k = "A";
+  if(sel === k || !keysFor().includes(k)) return;
   sel = k;
   renderControls();
   save();
 }
+function selName(k){
+  if(k === "T") return "la figura";
+  if(PKEYS.includes(k)) return "la pieza " + k;
+  return !comparing ? "el modelo" : k === "A" ? "el modelo (A)" : "la opción (B)";
+}
+function fillSeg(el, keys, isOn, onClick){
+  el.innerHTML = "";
+  el.style.gridTemplateColumns = "repeat(" + keys.length + ", minmax(0,1fr))";
+  for(const k of keys){
+    const b = document.createElement("button");
+    b.innerHTML = tabLabel(k);
+    if(PKEYS.includes(k)) b.setAttribute("aria-label", "Pieza " + k);
+    b.setAttribute("aria-pressed", isOn(k));
+    b.addEventListener("click", () => onClick(k));
+    el.appendChild(b);
+  }
+}
 function renderControls(){
-  $("selName").textContent = !comparing ? "el modelo" : sel === "A" ? "el modelo (A)" : "la opción (B)";
-  $("selA").setAttribute("aria-pressed", sel === "A");
-  $("selB").setAttribute("aria-pressed", sel === "B");
-  $("cardA").classList.toggle("selected", comparing && sel === "A");
-  $("cardB").classList.toggle("selected", comparing && sel === "B");
+  const keys = keysFor();
+  if(!keys.includes(sel)) sel = keys[0];
+  $("selName").textContent = selName(sel);
+  $("selSeg").hidden = keys.length < 2;
+  fillSeg($("selSeg"), keys, k => k === sel, select);
+  for(const k of ALL) $("card"+k).classList.toggle("selected", keys.length > 1 && keys.includes(k) && sel === k);
   $("btnRings").setAttribute("aria-pressed", viewers[sel].ringsOn);
   $("btnLink").setAttribute("aria-pressed", linkOn);
 }
-$("selA").addEventListener("click", () => select("A"));
-$("selB").addEventListener("click", () => select("B"));
 
 const rg = $("rotgrid");
 for(const [ax, col, name] of [["x","#D9534F","Eje X"],["y","#2E9E5B","Eje Y"],["z","#3B6FD8","Eje Z"]]){
@@ -960,7 +1150,7 @@ document.addEventListener("keydown", e => {
   if(t && (t.closest("select, input, textarea, .grid, .canvas") )) return;
   viewers[sel].handleKey(e);
 });
-["A","B"].forEach(k => {
+ALL.forEach(k => {
   viewers[k].onPick = key => {
     // Solo se edita la figura activa; tocar otra vista (o una confirmada) no cambia de modo
     if(active !== k || !key) return;
@@ -970,8 +1160,7 @@ document.addEventListener("keydown", e => {
   };
 });
 function refreshViews(){
-  viewers.A.setFigure(figs.A, active === "A" ? layer : null);
-  viewers.B.setFigure(figs.B, active === "B" ? layer : null);
+  for(const k of modeKeys()) viewers[k].setFigure(figs[k], active === k ? layer : null, figOpts(k));
 }
 
 // Selectores de tamaño
@@ -994,23 +1183,25 @@ function setActive(k){
   save();
 }
 $("btnConfirm").addEventListener("click", () => setActive(null));
-$("tabA").addEventListener("click", () => setActive("A"));
-$("tabB").addEventListener("click", () => setActive("B"));
 document.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => setActive(b.dataset.edit)));
 
 function renderEditor(){
-  $("tabA").setAttribute("aria-pressed", active==="A");
-  $("tabB").setAttribute("aria-pressed", active==="B");
-  $("cardA").classList.toggle("active", active==="A");
-  $("cardB").classList.toggle("active", active==="B");
-  document.querySelector('[data-edit="A"]').textContent = active==="A" ? "Editando" : "Editar";
-  document.querySelector('[data-edit="B"]').textContent = active==="B" ? "Editando" : "Editar";
-  $("editTitle").textContent = active ? "Estás editando" : comparing ? "Ninguna figura en edición" : "Modelo confirmado";
-  $("editLocked").textContent = comparing
+  fillSeg($("editSeg"), keysFor(), k => k === active, setActive);
+  for(const k of ALL){
+    $("card"+k).classList.toggle("active", active === k);
+    document.querySelector('[data-edit="'+k+'"]').textContent = active === k ? "Editando" : "Editar";
+  }
+  const cons = mode === "cons";
+  $("editTitle").textContent = active ? "Estás editando" + (cons ? " " + selName(active) : "")
+    : cons || comparing ? "Ninguna figura en edición" : "Modelo confirmado";
+  $("editLocked").textContent = cons
+    ? "La figura y las piezas están confirmadas: puedes girarlas y tocarlas sin cambiar nada. Para modificar una, pulsa su botón aquí arriba o Editar en su vista."
+    : comparing
     ? "Las figuras están confirmadas: puedes girarlas y tocarlas sin cambiar nada. Para modificar una, pulsa Modelo (A) u Opción (B) aquí arriba, o Editar en su vista."
     : "El modelo está confirmado: puedes girarlo y tocarlo sin cambiar nada. Para modificarlo, pulsa Modelo (A) aquí arriba o Editar en su vista.";
   $("editLocked").hidden = !!active;
   $("editBody").hidden = !active;
+  $("btnConfirm").textContent = cons ? "Confirmar" : "Confirmar figura";
   if(!active){ refreshViews(); return; }
   const f = figs[active];
   $("btnCopy").textContent = active==="A" ? "Copiar en B" : "Copiar en A";
@@ -1087,14 +1278,15 @@ function renderEditor(){
 })();
 
 function changed(k, light){
-  viewers[k].setFigure(figs[k], k === active ? layer : null);
+  viewers[k].setFigure(figs[k], k === active ? layer : null, figOpts(k));
   $("count"+k).textContent = figs[k].c.size + (figs[k].c.size===1 ? " cubo" : " cubos");
   $("empty"+k).hidden = figs[k].c.size > 0;
   if(!light) renderEditor(); else { updateLevelCounts(); }
-  compare();
+  if(k === "A" || k === "B") compare(); else consChanged();
   save();
 }
 function updateLevelCounts(){
+  if(!active) return;
   const f = figs[active];
   const btns = $("levels").querySelectorAll("button");
   btns.forEach((b, i) => {
@@ -1168,13 +1360,366 @@ $("btnAlign").addEventListener("click", () => {
   viewers.B.animateTo(qA.clone().multiply(rotQuat(alignRot)), true);
 });
 
+/* ---------- Construcción: qué tres piezas forman la figura ---------- */
+const keyOf = v => v.join(",");
+const parseKey = s => s.split(",").map(Number);
+const DIRS = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+function normPts(list){
+  const mn = [0,1,2].map(i => Math.min(...list.map(v => v[i])));
+  return list.map(v => [v[0]-mn[0], v[1]-mn[1], v[2]-mn[2]]);
+}
+const cellOrder = (a, b) => a[1]-b[1] || a[2]-b[2] || a[0]-b[0];
+// Todas las posturas distintas de una pieza (24 giros, o sus reflejos si mirror)
+function orients(points, mirror){
+  const src = mirror ? points.map(v => [-v[0], v[1], v[2]]) : points;
+  const seen = new Set(), out = [];
+  for(const r of ROTS){
+    const p = normPts(src.map(v => applyRot(r, v)));
+    const key = p.map(keyOf).sort().join("|");
+    if(seen.has(key)) continue;
+    seen.add(key);
+    out.push({r, mir:mirror, pts:p, anchor:p.slice().sort(cellOrder)[0]});
+  }
+  return out;
+}
+function canon(points){
+  let best = null;
+  for(const r of ROTS){ const k = norm(points.map(v => applyRot(r, v))); if(best === null || k < best) best = k; }
+  return best;
+}
+// Busca cómo colocar las piezas para llenar exactamente la figura (sin huecos ni solapes)
+function tile(tKeys, items, mirror){
+  const T = new Set(tKeys);
+  const order = tKeys.map(parseKey).sort(cellOrder).map(keyOf);
+  const opts = items.map(it => ({k:it.k, os: orients(it.pts, false).concat(mirror ? orients(it.pts, true) : [])}));
+  const covered = new Set(), used = items.map(() => false), place = [];
+  let budget = 300000;
+  function rec(){
+    if(--budget < 0) return false;
+    let cell = null;
+    for(const c of order) if(!covered.has(c)){ cell = parseKey(c); break; }
+    if(!cell) return used.every(Boolean);
+    // La primera casilla libre tiene que ser la primera casilla de la pieza que la ocupe
+    for(let i=0; i<opts.length; i++){
+      if(used[i]) continue;
+      for(const o of opts[i].os){
+        const a = o.anchor, off = [cell[0]-a[0], cell[1]-a[1], cell[2]-a[2]];
+        const cells = []; let ok = true;
+        for(const p of o.pts){
+          const s = (p[0]+off[0]) + "," + (p[1]+off[1]) + "," + (p[2]+off[2]);
+          if(!T.has(s) || covered.has(s)){ ok = false; break; }
+          cells.push(s);
+        }
+        if(!ok) continue;
+        used[i] = true; cells.forEach(s => covered.add(s));
+        place.push({k:opts[i].k, r:o.r, mir:o.mir, cells});
+        if(rec()) return true;
+        place.pop(); cells.forEach(s => covered.delete(s)); used[i] = false;
+      }
+    }
+    return false;
+  }
+  return rec() ? place.slice() : null;
+}
+// tKeys: casillas de la figura; pieces: {"1": puntos, ...}
+function solveCore(tKeys, pieces){
+  const keys = Object.keys(pieces), N = tKeys.length;
+  const sizes = {}; keys.forEach(k => sizes[k] = pieces[k].length);
+  const countOdd = keys.filter(o => keys.filter(k => k !== o).reduce((s, k) => s + sizes[k], 0) === N);
+  const run = mirror => countOdd.map(o => {
+    const place = tile(tKeys, keys.filter(k => k !== o).map(k => ({k, pts:pieces[k]})), mirror);
+    return place ? {odd:o, place} : null;
+  }).filter(Boolean);
+  const base = {N, sizes, countOdd};
+  const sols = run(false);
+  if(sols.length === 1) return {...base, status:"one", sols};
+  if(sols.length > 1) return {...base, status:"many", sols};
+  const ms = run(true);
+  if(ms.length) return {...base, status:"mirror", sols:[], mirrorOdds:ms.map(s => s.odd)};
+  return {...base, status:"none", sols:[]};
+}
+function solveCons(){
+  if(!figs.T.c.size) return {status:"empty"};
+  const missing = PKEYS.filter(k => !figs[k].c.size);
+  if(missing.length) return {status:"missing", missing};
+  const pieces = {}; PKEYS.forEach(k => pieces[k] = pts(figs[k]));
+  return solveCore([...figs.T.c], pieces);
+}
+
+let cs = {res:{status:"empty"}, revealed:false, wrong:new Set(), last:null, step:null, hint:false, answer:null};
+function consSol(){ return cs.revealed && cs.res.sols && cs.res.sols.length ? cs.res.sols[0] : null; }
+function figOpts(k){
+  if(!CKEYS.includes(k)) return null;
+  const sol = consSol();
+  if(k === "T"){
+    if(!sol) return null;
+    const colors = new Map();
+    for(const p of sol.place) for(const c of p.cells) colors.set(c, PCOL[p.k]);
+    const st = cs.step && sol.place.find(p => p.k === cs.step);
+    return {colors, focus: st ? new Set(st.cells) : null};
+  }
+  return {color: sol && sol.odd === k ? GREY : PCOL[k]};
+}
+function paintCons(){ for(const k of CKEYS) viewers[k].setFigure(figs[k], active === k ? layer : null, figOpts(k)); }
+function consChanged(){
+  const was = cs.revealed;
+  cs = {res:solveCons(), revealed:false, wrong:new Set(), last:null, step:null, hint:false, answer:null};
+  if(was) paintCons();
+  renderCons();
+}
+function listY(ks){
+  const n = ks.map(k => "la " + k);
+  return n.length < 2 ? n.join("") : n.slice(0, -1).join(", ") + " o " + n[n.length-1];
+}
+function listAnd(ks){ return ks.length < 2 ? ks.join("") : ks.slice(0, -1).join(", ") + " y " + ks[ks.length-1]; }
+function renderCons(){
+  const r = cs.res, sol = consSol();
+  let cls = "neutral", t = "", d = "";
+  const can = r.status === "one" || r.status === "many";
+  if(r.status === "empty"){
+    t = "Construye la figura y las cuatro piezas.";
+    d = "Copia el enunciado con el editor, o pulsa Nuevo ejercicio para practicar con uno inventado.";
+  } else if(r.status === "missing"){
+    t = "Faltan piezas por construir.";
+    d = (r.missing.length > 1 ? "Todavía no tienen cubos las piezas " : "Todavía no tiene cubos la pieza ") + listAnd(r.missing) + ".";
+  } else if(sol){
+    const used = sol.place.map(p => p.k).sort();
+    if(r.status === "many"){ cls = "warn"; t = "Una de las soluciones: sobra la pieza " + sol.odd + "."; }
+    else { cls = "ok"; t = cs.answer === sol.odd ? "¡Correcto! Sobra la pieza " + sol.odd + "." : "Sobra la pieza " + sol.odd + "."; }
+    d = "Las piezas " + listAnd(used) + " forman la figura: cada una aparece dentro con su color. En Ver puedes mirarlas de una en una.";
+  } else if(r.status === "one"){
+    if(cs.last){ cls = "bad"; t = "La pieza " + cs.last + " sí se usa."; d = "Prueba con otra pieza."; }
+    else { t = "¿Qué pieza sobra?"; d = "Tres de las cuatro piezas forman la figura. Gíralas y, cuando lo tengas, pulsa Sobra esta en la pieza que no se usa."; }
+  } else if(r.status === "many"){
+    cls = "warn"; t = "Hay más de una respuesta.";
+    d = "La figura se puede formar sin " + listY(r.sols.map(s => "pieza " + s.odd)) + ". Revisa que hayas copiado bien el enunciado.";
+  } else if(r.status === "mirror"){
+    cls = "warn"; t = "Solo encaja si se refleja alguna pieza.";
+    d = "Girando, ninguna combinación de tres piezas forma la figura. Con una pieza en espejo sobraría " + listY(r.mirrorOdds.map(k => "pieza " + k)) + ": revisa si has copiado alguna pieza al revés.";
+  } else {
+    cls = "bad"; t = "Ninguna combinación de tres piezas forma la figura.";
+    d = "La figura tiene " + r.N + " cubos y las piezas " + listAnd(PKEYS.map(k => r.sizes[k])) + "."
+      + (r.countOdd.length ? "" : " Ningún grupo de tres piezas suma " + r.N + " cubos.")
+      + " Revisa que hayas copiado bien el enunciado.";
+  }
+  if(cs.hint && can && !sol){
+    d += " Pista: la figura tiene " + r.N + " cubos y las piezas " + listAnd(PKEYS.map(k => r.sizes[k])) + ". "
+      + (r.countOdd.length === PKEYS.length
+        ? "Aquí contar no descarta ninguna, así que fíjate en la forma: busca primero dónde cabe la pieza más rara."
+        : "Las tres que se usan tienen que sumar " + r.N + ", así que solo puede sobrar " + listY(r.countOdd.map(k => "pieza " + k)) + ".");
+  }
+  $("cverdict").className = "panel verdict " + cls;
+  $("cTitle").textContent = t; $("cText").textContent = d;
+  $("btnHint").hidden = !can || !!sol || cs.hint;
+  $("btnReveal").hidden = !can || !!sol;
+  $("btnOrient").hidden = !sol;
+  const showAns = r.status === "one" && !sol;
+  document.querySelectorAll("[data-ans]").forEach(b => { b.hidden = !showAns || cs.wrong.has(b.dataset.ans); });
+  for(const k of PKEYS){
+    const tag = $("tag"+k);
+    const odd = sol && sol.odd === k, usedK = (sol && !odd) || (!sol && cs.wrong.has(k));
+    tag.hidden = !(odd || usedK);
+    tag.className = "tag " + (odd ? "odd" : "used");
+    tag.textContent = odd ? "Sobra" : "Se usa";
+    $("card"+k).classList.toggle("odd", !!odd);
+  }
+  const steps = $("steps");
+  steps.hidden = !sol;
+  steps.innerHTML = "";
+  if(sol){
+    const lab = document.createElement("span"); lab.textContent = "Ver:"; steps.appendChild(lab);
+    for(const k of [null, ...sol.place.map(p => p.k).sort()]){
+      const b = document.createElement("button");
+      b.className = "btn sm";
+      b.innerHTML = k ? dotHTML(k) + "<b>Pieza " + k + "</b>" : "<b>Todas</b>";
+      b.setAttribute("aria-pressed", cs.step === k);
+      b.addEventListener("click", () => { cs.step = k; paintCons(); renderCons(); });
+      steps.appendChild(b);
+    }
+  }
+}
+document.querySelectorAll("[data-ans]").forEach(b => b.addEventListener("click", () => {
+  const k = b.dataset.ans, r = cs.res;
+  if(r.status !== "one") return;
+  cs.answer = k;
+  if(k === r.sols[0].odd){ cs.revealed = true; cs.last = null; paintCons(); }
+  else { cs.wrong.add(k); cs.last = k; }
+  renderCons();
+}));
+$("btnHint").addEventListener("click", () => { cs.hint = true; renderCons(); });
+$("btnReveal").addEventListener("click", () => { cs.revealed = true; paintCons(); renderCons(); });
+$("btnOrient").addEventListener("click", () => {
+  const sol = consSol(); if(!sol) return;
+  const qT = viewers.T.target().clone();
+  for(const p of sol.place) viewers[p.k].animateTo(qT.clone().multiply(rotQuat(p.r)), true);
+});
+
+/* ---------- Generador de ejercicios ---------- */
+const LEVELS = {
+  1: {n:[8,9],   box:[3,3,3], min:2},
+  2: {n:[10,12], box:[3,3,3], min:3},
+  3: {n:[13,15], box:[4,3,3], min:3}
+};
+const rnd = n => Math.floor(Math.random()*n);
+const pick = a => a[rnd(a.length)];
+function neighbours(v){ return DIRS.map(d => [v[0]+d[0], v[1]+d[1], v[2]+d[2]]); }
+function connected(list){
+  if(!list.length) return false;
+  const S = new Set(list.map(keyOf)), seen = new Set([keyOf(list[0])]), q = [list[0]];
+  while(q.length){ for(const w of neighbours(q.pop())){ const k = keyOf(w); if(S.has(k) && !seen.has(k)){ seen.add(k); q.push(w); } } }
+  return seen.size === S.size;
+}
+// Figura que se sostiene: todo cubo que no está en el suelo tiene otro debajo
+function grow(N, box){
+  const S = new Set([keyOf([rnd(box[0]), 0, rnd(box[2])])]);
+  while(S.size < N){
+    const fr = new Set();
+    for(const s of S) for(const w of neighbours(parseKey(s))){
+      if(w.some((x, i) => x < 0 || x >= box[i])) continue;
+      const k = keyOf(w);
+      if(S.has(k) || (w[1] > 0 && !S.has(keyOf([w[0], w[1]-1, w[2]])))) continue;
+      fr.add(k);
+    }
+    if(!fr.size) return null;
+    S.add(pick([...fr]));
+  }
+  return S;
+}
+// Reparte la figura en tres piezas conectadas, haciendo crecer siempre la más pequeña
+function partition(S, min){
+  const cells = [...S], seeds = [];
+  while(seeds.length < 3){ const c = pick(cells); if(!seeds.includes(c)) seeds.push(c); }
+  const own = new Map(), parts = [new Set(), new Set(), new Set()];
+  seeds.forEach((s, i) => { own.set(s, i); parts[i].add(s); });
+  while(own.size < cells.length){
+    const order = [0,1,2].sort((a, b) => parts[a].size - parts[b].size || Math.random() - .5);
+    let grown = false;
+    for(const i of order){
+      const fr = [];
+      for(const s of parts[i]) for(const w of neighbours(parseKey(s))){ const k = keyOf(w); if(S.has(k) && !own.has(k)) fr.push(k); }
+      if(fr.length){ const k = pick(fr); own.set(k, i); parts[i].add(k); grown = true; break; }
+    }
+    if(!grown) return null;
+  }
+  if(parts.some(p => p.size < min)) return null;
+  return parts.map(p => [...p].map(parseKey));
+}
+// Pieza trampa: una pieza real en espejo, o con un cubo cambiado de sitio (mismo número de cubos)
+function mutate(p){
+  for(let t=0; t<30; t++){
+    const i = rnd(p.length), rest = p.filter((_, j) => j !== i);
+    if(!connected(rest)) continue;
+    const taken = new Set(p.map(keyOf));
+    const cand = [];
+    for(const v of rest) for(const w of neighbours(v)) if(!taken.has(keyOf(w))) cand.push(w);
+    if(cand.length) return rest.concat([pick(cand)]);
+  }
+  return null;
+}
+function makeDecoy(parts){
+  const canons = parts.map(canon);
+  for(let t=0; t<25; t++){
+    const base = pick(parts);
+    const d = Math.random() < 0.4 ? base.map(v => [-v[0], v[1], v[2]]) : mutate(base);
+    if(!d) continue;
+    const nd = normPts(d);
+    if(nd.some(v => v.some(x => x >= MAX))) continue;
+    if(!canons.includes(canon(nd))) return nd;
+  }
+  return null;
+}
+function toFig(points){
+  const p = normPts(points);
+  const n = [0,1,2].map(i => Math.max(...p.map(v => v[i])) + 1);
+  return mkFig(n, p.map(keyOf));
+}
+// Personalizado: caja máxima elegida y, en automático, la figura ocupa más o menos la mitad
+const GEN_KEY = "taller-cubos-gen";
+function customLevel(){
+  const box = [+$("gX").value, +$("gY").value, +$("gZ").value];
+  const vol = box[0]*box[1]*box[2];
+  let n;
+  if($("gN").value === "auto"){
+    const lo = Math.max(6, Math.round(vol*0.42)), hi = Math.max(lo, Math.round(vol*0.55));
+    n = [Math.min(lo, vol), Math.min(hi, vol)];
+  } else n = [+$("gN").value, +$("gN").value];
+  return {n, box, min: n[0] >= 9 ? 3 : 2};
+}
+function fillCubes(){
+  const vol = +$("gX").value * +$("gY").value * +$("gZ").value;
+  const s = $("gN"), prev = s.value;
+  s.innerHTML = '<option value="auto">Automático</option>';
+  for(let i=6; i<=vol; i++){ const o = document.createElement("option"); o.value = i; o.textContent = i; s.appendChild(o); }
+  s.value = [...s.options].some(o => o.value === prev) ? prev : "auto";
+}
+function saveGen(){
+  try{ localStorage.setItem(GEN_KEY, JSON.stringify({level:$("level").value, x:$("gX").value, y:$("gY").value, z:$("gZ").value, n:$("gN").value})); }catch(e){}
+}
+(function(){
+  for(const id of ["gX","gY","gZ"]){
+    const s = $(id);
+    for(let i=2; i<=5; i++){ const o = document.createElement("option"); o.value = i; o.textContent = i; s.appendChild(o); }
+    s.value = 3;
+    s.addEventListener("change", () => { fillCubes(); saveGen(); });
+  }
+  fillCubes();
+  try{
+    const g = JSON.parse(localStorage.getItem(GEN_KEY) || "null");
+    if(g){
+      for(const [id, v] of [["level",g.level],["gX",g.x],["gY",g.y],["gZ",g.z]])
+        if([...$(id).options].some(o => o.value === v)) $(id).value = v;
+      fillCubes();
+      if([...$("gN").options].some(o => o.value === g.n)) $("gN").value = g.n;
+    }
+  }catch(e){}
+  $("custom").hidden = $("level").value !== "c";
+  $("level").addEventListener("change", () => { $("custom").hidden = $("level").value !== "c"; saveGen(); });
+  $("gN").addEventListener("change", saveGen);
+})();
+function generate(level){
+  const L = level === "c" ? customLevel() : LEVELS[level] || LEVELS[2];
+  for(let attempt=0; attempt<400; attempt++){
+    const S = grow(L.n[0] + rnd(L.n[1] - L.n[0] + 1), L.box);
+    if(!S) continue;
+    const parts = partition(S, L.min);
+    if(!parts) continue;
+    const decoy = makeDecoy(parts);
+    if(!decoy) continue;
+    // Solo vale si la única forma de construir la figura es sin la trampa
+    const res = solveCore([...S], {"1":parts[0], "2":parts[1], "3":parts[2], "4":decoy});
+    if(res.status !== "one" || res.sols[0].odd !== "4") continue;
+    const items = [...parts, decoy].sort(() => Math.random() - .5);
+    figs.T = toFig([...S].map(parseKey));
+    PKEYS.forEach((k, i) => { const r = pick(ROTS); figs[k] = toFig(items[i].map(v => applyRot(r, v))); });
+    active = null; sel = "T";
+    for(const k of CKEYS){
+      const v = viewers[k];
+      v.anim = null; v.spin = null; v.group.quaternion.identity(); v.setZoom(1);
+    }
+    for(const k of CKEYS) changed(k, true);
+    renderEditor(); renderControls();
+    save();
+    return true;
+  }
+  return false;
+}
+$("btnNew").addEventListener("click", () => {
+  if(generate($("level").value)) return;
+  // Con cajas muy pequeñas (o casi llenas) a veces no hay forma de hacer un ejercicio con una sola respuesta
+  $("cverdict").className = "panel verdict warn";
+  $("cTitle").textContent = "No he encontrado un ejercicio con ese tamaño.";
+  $("cText").textContent = "Prueba con una caja más grande o con otro número de cubos. El ejercicio anterior sigue aquí.";
+});
+
 // Bucle de render
-function loop(now){ viewers.A.tick(now); viewers.B.tick(now); requestAnimationFrame(loop); }
+function loop(now){ for(const k of ALL) viewers[k].tick(now); requestAnimationFrame(loop); }
 
 restore();
 linkOn = savedLink;
-changed("A"); changed("B");
-if(!comparing && active === "B") active = "A";
+if(!comparing){ if(memo.rot.active === "B") memo.rot.active = "A"; memo.rot.sel = "A"; }
+active = memo[mode].active; sel = memo[mode].sel;
+for(const k of ALL) changed(k, true);
+if(mode === "cons" && CKEYS.every(k => !figs[k].c.size)) generate($("level").value);
 setActive(active);
 setCompare(comparing);
 requestAnimationFrame(loop);
